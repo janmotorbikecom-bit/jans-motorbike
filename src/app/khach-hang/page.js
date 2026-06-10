@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { callAPI } from '@/lib/api';
+import { getUser, canWrite } from '@/lib/auth';
 import CustomerProfileModal from '@/components/CustomerProfileModal';
 import InvoiceModal from '@/components/InvoiceModal';
 
@@ -124,6 +125,13 @@ export default function KhachHangPage() {
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [invoiceCustomer, setInvoiceCustomer] = useState(null);
+  const [user, setUser] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+
+  useEffect(() => {
+    setUser(getUser());
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -138,10 +146,24 @@ export default function KhachHangPage() {
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-6 transition-colors duration-150">
       <div className="w-full">
-        <header className="mb-6 sm:mb-8">
-          <p className="text-orange-500 text-sm font-semibold mb-1">JAN&apos;S MOTORBIKE</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Quản lý khách hàng</h1>
-          <p className="mt-2 text-sm text-[var(--text-secondary)]">Danh sách khách hàng đang thuê xe</p>
+        <header className="mb-6 sm:mb-8 flex items-center justify-between">
+          <div>
+            <p className="text-orange-500 text-sm font-semibold mb-1">JAN&apos;S MOTORBIKE</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Quản lý khách hàng</h1>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">Danh sách khách hàng đang thuê xe</p>
+          </div>
+          {canWrite(user) && (
+            <button 
+              onClick={() => {
+                setEditingCustomer({});
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Thêm Khách Hàng
+            </button>
+          )}
         </header>
 
         <div className="mb-6">

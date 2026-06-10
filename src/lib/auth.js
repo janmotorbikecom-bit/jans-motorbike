@@ -39,7 +39,7 @@ export function isLoggedIn() {
 // Kiểm tra role
 export function isAdmin(user) {
   const role = (user?.vaiTro || '').toLowerCase();
-  return role === 'admin' || role === 'quản trị viên';
+  return role === 'admin' || role.includes('quản trị');
 }
 
 export function canWrite(user) {

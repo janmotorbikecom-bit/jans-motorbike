@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { callAPI } from '@/lib/api';
+import { getUser, canWrite, canDelete } from '@/lib/auth';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -45,7 +46,10 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
 
+  const [user, setUser] = useState(null);
+
   useEffect(() => {
+    setUser(getUser());
     if (open && customer) {
       setActiveTab('info');
       setFormData(customer);
@@ -205,8 +209,12 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
           <div className="flex items-center gap-3">
             {!isEditing && !customer.isGuest && (
               <>
-                <button onClick={() => setIsEditing(true)} className="text-sm px-3 py-1.5 rounded bg-[var(--bg-hover)] text-[var(--text-primary)] hover:text-orange-500 transition-colors">✏️ Sửa</button>
-                <button onClick={handleDelete} disabled={saving} className="text-sm px-3 py-1.5 rounded bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors">🗑️ Xóa</button>
+                {canWrite(user) && (
+                  <button onClick={() => setIsEditing(true)} className="text-sm px-3 py-1.5 rounded bg-[var(--bg-hover)] text-[var(--text-primary)] hover:text-orange-500 transition-colors">✏️ Sửa</button>
+                )}
+                {canDelete(user) && (
+                  <button onClick={handleDelete} disabled={saving} className="text-sm px-3 py-1.5 rounded bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors">🗑️ Xóa</button>
+                )}
               </>
             )}
             <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '24px', lineHeight: 1 }}>×</button>

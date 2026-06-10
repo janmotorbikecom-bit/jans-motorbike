@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { callAPI } from '@/lib/api';
+import { getUser, canWrite, canDelete } from '@/lib/auth';
 
 function fmtMoney(n) {
   if (!n || isNaN(n)) return '—';
@@ -22,8 +23,10 @@ function VehicleProfileModal({ open, onClose, xe, thuChiData, onSuccess, uniqueB
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
+    setUser(getUser());
     if (open && xe) {
       setFormData(xe);
       setIsEditing(false);
@@ -98,8 +101,8 @@ function VehicleProfileModal({ open, onClose, xe, thuChiData, onSuccess, uniqueB
           <div className="flex items-center gap-3">
             {!isEditing && (
               <>
-                <button onClick={() => setIsEditing(true)} className="text-sm px-3 py-1.5 rounded bg-[var(--bg-hover)] text-[var(--text-primary)] hover:text-orange-500 transition-colors">✏️ Sửa</button>
-                <button onClick={handleDelete} disabled={loading} className="text-sm px-3 py-1.5 rounded bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors">🗑️ Xóa</button>
+                {canWrite(user) && <button onClick={() => setIsEditing(true)} className="text-sm px-3 py-1.5 rounded bg-[var(--bg-hover)] text-[var(--text-primary)] hover:text-orange-500 transition-colors">✏️ Sửa</button>}
+                {canDelete(user) && <button onClick={handleDelete} disabled={loading} className="text-sm px-3 py-1.5 rounded bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors">🗑️ Xóa</button>}
               </>
             )}
             <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '24px', lineHeight: 1 }}>×</button>
@@ -376,6 +379,11 @@ export default function QuanLyXe() {
   const [selectedXe, setSelectedXe] = useState(null);
   const [showAddXe, setShowAddXe] = useState(false);
   const [showCapital, setShowCapital] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    setUser(getUser());
+  }, []);
 
   const uniqueBrands = useMemo(() => {
     const brands = new Set();
@@ -443,9 +451,11 @@ export default function QuanLyXe() {
           <h1 className="text-3xl font-bold">Quản lý xe</h1>
           <p className="text-[var(--text-secondary)] mt-1">Danh sách toàn bộ xe trong hệ thống</p>
         </div>
-        <button onClick={() => setShowAddXe(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
-          <span className="text-lg leading-none">+</span> Thêm xe mới
-        </button>
+        {canWrite(user) && (
+          <button onClick={() => setShowAddXe(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl font-medium shadow-lg shadow-orange-500/20 transition-all flex items-center gap-2">
+            <span className="text-lg leading-none">+</span> Thêm xe mới
+          </button>
+        )}
       </div>
 
       {/* Stat Cards */}
@@ -474,7 +484,7 @@ export default function QuanLyXe() {
         <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-4">
           <p className="text-[var(--text-secondary)] text-sm flex items-center justify-between">
             Tổng giá vốn
-            <button onClick={() => setShowCapital(true)} className="text-xs bg-[var(--bg-hover)] px-2 py-0.5 rounded text-[var(--text-primary)] hover:text-blue-500 transition-colors">Sửa vốn CK trước</button>
+            {canWrite(user) && <button onClick={() => setShowCapital(true)} className="text-xs bg-[var(--bg-hover)] px-2 py-0.5 rounded text-[var(--text-primary)] hover:text-blue-500 transition-colors">Sửa vốn CK trước</button>}
           </p>
           <p className="text-xl font-bold text-orange-500 mt-1">{fmtMoney(tongVon)}</p>
           

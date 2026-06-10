@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { callAPI } from '@/lib/api';
 import { useStore } from '@/lib/store';
+import { getUser, canWrite, canDelete } from '@/lib/auth';
 import CustomerProfileModal from '@/components/CustomerProfileModal';
 
 function fmtMoney(n) {
@@ -165,6 +166,11 @@ export default function ThuChiPage() {
   const [deleteLoading, setDeleteLoading] = useState({});
   const [billSentLoading, setBillSentLoading] = useState({});
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    setUser(getUser());
+  }, []);
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type });
