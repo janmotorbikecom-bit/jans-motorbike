@@ -76,7 +76,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
     if (!confirm('Bạn có chắc chắn muốn xóa khách hàng này không? Hành động này không thể hoàn tác!')) return;
     setSaving(true);
     try {
-      await callAPI('deleteKhachHang', { tenKH: customer.tenKH, bienSo: customer.bienSo });
+      await callAPI('deleteKhachHang', customer.tenKH, customer.bienSo);
       onSuccess && onSuccess();
       onClose();
     } catch (err) {
