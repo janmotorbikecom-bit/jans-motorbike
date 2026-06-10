@@ -18,6 +18,7 @@ export async function POST(request) {
         fn: body.fn,
         args: body.args || [],
         secret: API_SECRET,
+        user: body.user,
       }),
       redirect: 'follow',
     });
