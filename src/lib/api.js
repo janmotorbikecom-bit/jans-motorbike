@@ -6,5 +6,8 @@ export async function callAPI(fn, ...args) {
   });
   const data = await res.json();
   if (!data.success) throw new Error(data.error);
+  if (data.data && typeof data.data === 'object' && data.data.success === false) {
+    throw new Error(data.data.error || 'Lỗi từ máy chủ');
+  }
   return data.data;
 }

@@ -1,0 +1,21 @@
+{
+  "name": "Jan's Motorbike",
+  "short_name": "Jan's Bike",
+  "description": "Quản lý cho thuê xe máy Jan's Motorbike",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
