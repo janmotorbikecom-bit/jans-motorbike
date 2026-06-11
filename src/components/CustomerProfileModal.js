@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { callAPI } from '@/lib/api';
 import { getUser, canWrite, canDelete } from '@/lib/auth';
 
+const DANH_MUC_THU = ['Tiền thuê tháng', 'Thuê mới', 'Thuê ngắn', 'Phụ thu', 'Bán xe'];
+const DANH_MUC_CHI = ['Bảo dưỡng', 'Thay phụ tùng', 'Nhiên liệu', 'Sửa chữa', 'Chi phí khác', 'Dịch vụ sửa xe', 'Thuế / phí cầu đường'];
+
 function formatDate(value) {
   if (!value) return '—';
   const str = String(value).trim();
@@ -36,6 +39,10 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
   
+  const [addTcOpen, setAddTcOpen] = useState(false);
+  const [tcForm, setTcForm] = useState({ loai: 'Thu', danhMuc: 'Tiền thuê tháng', soTien: '', ghiChu: '' });
+  const [addingTc, setAddingTc] = useState(false);
+  
   // Notes state
   const [notes, setNotes] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -63,8 +70,17 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
     setSaving(true);
     try {
       // GAS updateKhachHang(originalTenKH, originalBienSo, newData)
+      // Strip nested objects that GAS cannot write to cells (causes crash/deletion bug)
+      const cleanData = { ...formData };
+      delete cleanData.chuKy;
+      delete cleanData.docs;
+      delete cleanData.stt;
+      // Inject user info so GAS can log who made the edit
+      cleanData.taiKhoan = user?.taiKhoan || 'admin';
+      cleanData.vaiTro = user?.vaiTro || 'Admin';
+
       // Always use original tenKH + bienSo as lookup keys
-      await callAPI('updateKhachHang', customer.tenKH, customer.bienSo, formData);
+      await callAPI('updateKhachHang', customer.tenKH, customer.bienSo, cleanData);
       // Wait for GAS to commit to Google Sheets before reloading
       await new Promise(r => setTimeout(r, 1500));
       onSuccess && onSuccess();
@@ -193,6 +209,38 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
     return (ten === cTen) || (b && cB && b === cB);
   }).sort((a, b) => (parseInt(b.rowNum) || 0) - (parseInt(a.rowNum) || 0));
 
+  const handleAddThuChi = async (e) => {
+    e.preventDefault();
+    if (!tcForm.soTien || !tcForm.danhMuc) return;
+    setAddingTc(true);
+    try {
+      const now = new Date();
+      const ngay = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+      
+      const payload = {
+        ngay,
+        loai: tcForm.loai,
+        danhMuc: tcForm.danhMuc,
+        khach: tcForm.loai === 'Thu' ? customer.tenKH : '',
+        nguoiMua: tcForm.loai === 'Chi' ? customer.tenKH : '',
+        bienSo: customer.bienSo || '',
+        soTien: tcForm.soTien,
+        chiNhanh: customer.chiNhanh || '',
+        congTacVien: customer.congTacVien || '',
+        ghiChu: tcForm.ghiChu || ''
+      };
+      
+      await callAPI('addThuChi', payload);
+      setTcForm({ loai: 'Thu', danhMuc: 'Tiền thuê tháng', soTien: '', ghiChu: '' });
+      setAddTcOpen(false);
+      onSuccess && onSuccess(); // Tải lại dữ liệu
+    } catch (err) {
+      alert('Lỗi thêm thu chi: ' + err.message);
+    } finally {
+      setAddingTc(false);
+    }
+  };
+
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 1000,
@@ -263,7 +311,16 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Xe thuê <span className="text-red-500">*</span></label>
-                      <input required type="text" value={formData.xeThue || ''} onChange={e => setFormData({...formData, xeThue: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <select required value={formData.xeThue || ''} onChange={e => {
+                        const val = e.target.value;
+                        const found = xeList?.find(x => x.tenXe === val || x.model === val || x.bienSo === val);
+                        setFormData({...formData, xeThue: val, bienSo: formData.bienSo || found?.bienSo || formData.bienSo, giaThue: formData.giaThue || found?.giaThue || formData.giaThue});
+                      }} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]">
+                        <option value={formData.xeThue}>{formData.xeThue}</option>
+                        {xeList?.filter(x => x.trangThai === 'Trống' && x.tenXe !== formData.xeThue).map(x => (
+                          <option key={x.bienSo} value={x.tenXe || x.model}>{x.tenXe || x.model} ({x.bienSo})</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Biển số <span className="text-red-500">*</span></label>
@@ -365,7 +422,51 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
 
           {/* TAB: LỊCH SỬ THANH TOÁN */}
           {activeTab === 'history' && (
-            <div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-2">
+                 <h3 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider">Lịch sử thu / chi</h3>
+                 {canWrite(user) && (
+                   <button onClick={() => setAddTcOpen(!addTcOpen)} className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded transition-colors">
+                     {addTcOpen ? 'Hủy' : '+ Thêm Giao Dịch'}
+                   </button>
+                 )}
+              </div>
+
+              {addTcOpen && (
+                <form onSubmit={handleAddThuChi} className="bg-[var(--bg-hover)] p-4 rounded-xl border border-[var(--border)] mb-4 space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs text-[var(--text-secondary)] mb-1">Loại</label>
+                      <select value={tcForm.loai} onChange={e => setTcForm({...tcForm, loai: e.target.value, danhMuc: e.target.value === 'Thu' ? DANH_MUC_THU[0] : DANH_MUC_CHI[0]})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm">
+                        <option value="Thu">Thu</option>
+                        <option value="Chi">Chi</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-secondary)] mb-1">Danh mục</label>
+                      <select required value={tcForm.danhMuc} onChange={e => setTcForm({...tcForm, danhMuc: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm">
+                        {(tcForm.loai === 'Thu' ? DANH_MUC_THU : DANH_MUC_CHI).map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-secondary)] mb-1">Số tiền *</label>
+                      <input required type="number" value={tcForm.soTien} onChange={e => setTcForm({...tcForm, soTien: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="100000" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-secondary)] mb-1">Ghi chú</label>
+                      <input type="text" value={tcForm.ghiChu} onChange={e => setTcForm({...tcForm, ghiChu: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="..." />
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button type="submit" disabled={addingTc} className="text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded disabled:opacity-50 transition-colors">
+                      {addingTc ? 'Đang lưu...' : 'Lưu giao dịch'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
               {paymentHistory.length === 0 ? (
                 <p className="text-[var(--text-secondary)] text-sm text-center py-8">Chưa có giao dịch nào liên quan.</p>
               ) : (

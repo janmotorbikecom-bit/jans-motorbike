@@ -119,7 +119,7 @@ function CustomerCard({ item, onClick, onInvoice }) {
 }
 
 // --- ADD CUSTOMER MODAL ---
-function AddCustomerModal({ open, onClose, onSuccess }) {
+function AddCustomerModal({ open, onClose, onSuccess, xeList }) {
   const emptyForm = { tenKH: '', bienSo: '', xeThue: '', giaThue: '', tienCoc: '', ngayBatDau: '', ngayKetThuc: '', chiNhanh: '', congTacVien: '', ghiChu: '' };
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -154,7 +154,19 @@ function AddCustomerModal({ open, onClose, onSuccess }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Tên khách hàng *</label><input required className={inp} value={form.tenKH} onChange={e => setForm({...form, tenKH: e.target.value})} placeholder="Nguyễn Văn A" /></div>
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Biển số *</label><input required className={inp + ' uppercase font-mono'} value={form.bienSo} onChange={e => setForm({...form, bienSo: e.target.value.toUpperCase()})} placeholder="79A1 123.45" /></div>
-            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Xe thuê *</label><input required className={inp} value={form.xeThue} onChange={e => setForm({...form, xeThue: e.target.value})} placeholder="Honda Air Blade" /></div>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Xe thuê *</label>
+              <select required className={inp} value={form.xeThue} onChange={e => {
+                const val = e.target.value;
+                const found = xeList?.find(x => x.tenXe === val || x.model === val || x.bienSo === val);
+                setForm({...form, xeThue: val, bienSo: found ? found.bienSo : form.bienSo, giaThue: found ? found.giaThue || form.giaThue : form.giaThue});
+              }}>
+                <option value="">-- Chọn xe --</option>
+                {xeList?.filter(x => x.trangThai === 'Trống').map(x => (
+                  <option key={x.bienSo} value={x.tenXe || x.model}>{x.tenXe || x.model} ({x.bienSo})</option>
+                ))}
+              </select>
+            </div>
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Số điện thoại</label><input className={inp} value={form.lienLac} onChange={e => setForm({...form, lienLac: e.target.value})} placeholder="09xxxxxxxx" /></div>
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Giá thuê (VND)</label><input type="number" className={inp} value={form.giaThue} onChange={e => setForm({...form, giaThue: e.target.value})} placeholder="1500000" /></div>
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Tiền cọ (VND)</label><input type="number" className={inp} value={form.tienCoc} onChange={e => setForm({...form, tienCoc: e.target.value})} placeholder="2500000" /></div>
@@ -358,17 +370,18 @@ export default function KhachHangPage() {
         )}
       </div>
 
-      <AddCustomerModal
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={() => { setIsModalOpen(false); reload(); }}
+      <AddCustomerModal 
+        open={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={reload} 
+        xeList={xe}
       />
-
       <CustomerProfileModal 
         open={!!selectedCustomer} 
         onClose={() => setSelectedCustomer(null)} 
         customer={selectedCustomer} 
         thuChiData={thuChi} 
+        xeList={xe}
         onSuccess={reload}
       />
       
