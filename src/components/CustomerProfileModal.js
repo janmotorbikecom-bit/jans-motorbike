@@ -253,7 +253,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Tên khách hàng <span className="text-red-500">*</span></label>
-                      <input required type="text" value={formData.tenKH || ''} onChange={e => setFormData({...formData, tenKH: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <input readOnly required type="text" value={formData.tenKH || ''} className="w-full bg-[var(--bg-hover)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-secondary)] cursor-not-allowed" title="Không thể đổi tên. Xóa và tạo mới nếu cần đổi tên." />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Số điện thoại</label>
@@ -267,7 +267,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Biển số <span className="text-red-500">*</span></label>
-                      <input required type="text" value={formData.bienSo || ''} onChange={e => setFormData({...formData, bienSo: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)] font-mono uppercase" />
+                      <input readOnly required type="text" value={formData.bienSo || ''} className="w-full bg-[var(--bg-hover)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-secondary)] font-mono uppercase cursor-not-allowed" title="Không thể đổi biển số. Xóa và tạo mới nếu cần đổi." />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
