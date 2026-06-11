@@ -62,7 +62,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
     e.preventDefault();
     setSaving(true);
     try {
-      await callAPI('updateKhachHang', { ...formData, originalBienSo: customer.bienSo, originalTenKH: customer.tenKH });
+      await callAPI('updateKhachHang', customer.tenKH, customer.bienSo, formData);
       onSuccess && onSuccess();
       onClose();
     } catch (err) {

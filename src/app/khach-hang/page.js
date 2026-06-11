@@ -118,7 +118,61 @@ function CustomerCard({ item, onClick, onInvoice }) {
   );
 }
 
-// --- CUSTOMER PROFILE MODAL MOVED TO COMPONENT ---
+// --- ADD CUSTOMER MODAL ---
+function AddCustomerModal({ open, onClose, onSuccess }) {
+  const emptyForm = { tenKH: '', bienSo: '', xeThue: '', giaThue: '', tienCoc: '', ngayBatDau: '', ngayKetThuc: '', chiNhanh: '', congTacVien: '', ghiChu: '' };
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) setForm(emptyForm); }, [open]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.tenKH.trim() || !form.bienSo.trim()) return alert('Vui lòng nhập tên và biển số!');
+    setSaving(true);
+    try {
+      await callAPI('addKhachHang', form);
+      onSuccess && onSuccess();
+      onClose();
+    } catch (err) {
+      alert('Lỗi thêm: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+  const inp = 'w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-orange-500';
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', width: '100%', maxWidth: '640px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontWeight: 700, fontSize: '18px' }}>Thêm Khách Hàng Mới</span>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '24px' }}>×</button>
+        </div>
+        <form onSubmit={handleSubmit} style={{ padding: '22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Tên khách hàng *</label><input required className={inp} value={form.tenKH} onChange={e => setForm({...form, tenKH: e.target.value})} placeholder="Nguyễn Văn A" /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Biển số *</label><input required className={inp + ' uppercase font-mono'} value={form.bienSo} onChange={e => setForm({...form, bienSo: e.target.value.toUpperCase()})} placeholder="79A1 123.45" /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Xe thuê *</label><input required className={inp} value={form.xeThue} onChange={e => setForm({...form, xeThue: e.target.value})} placeholder="Honda Air Blade" /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Số điện thoại</label><input className={inp} value={form.lienLac} onChange={e => setForm({...form, lienLac: e.target.value})} placeholder="09xxxxxxxx" /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Giá thuê (VND)</label><input type="number" className={inp} value={form.giaThue} onChange={e => setForm({...form, giaThue: e.target.value})} placeholder="1500000" /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Tiền cọ (VND)</label><input type="number" className={inp} value={form.tienCoc} onChange={e => setForm({...form, tienCoc: e.target.value})} placeholder="2500000" /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Ngày bắt đầu</label><input type="date" className={inp} value={form.ngayBatDau} onChange={e => setForm({...form, ngayBatDau: e.target.value})} /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Ngày kết thúc</label><input type="date" className={inp} value={form.ngayKetThuc} onChange={e => setForm({...form, ngayKetThuc: e.target.value})} /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Chi nhánh</label><input className={inp} value={form.chiNhanh} onChange={e => setForm({...form, chiNhanh: e.target.value})} /></div>
+            <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Cộng tác viên</label><input className={inp} value={form.congTacVien} onChange={e => setForm({...form, congTacVien: e.target.value})} /></div>
+          </div>
+          <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Ghi chú</label><textarea className={inp} rows={2} value={form.ghiChu} onChange={e => setForm({...form, ghiChu: e.target.value})} /></div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors">Hủy</button>
+            <button type="submit" disabled={saving} className="px-6 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors">{saving ? 'Đang lưu...' : 'Thêm Khách Hàng'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function KhachHangPage() {
   const { khachHang: customers, xe, thuChi, loading, error, reload } = useStore();
@@ -275,6 +329,12 @@ export default function KhachHangPage() {
           </>
         )}
       </div>
+
+      <AddCustomerModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={() => { setIsModalOpen(false); reload(); }}
+      />
 
       <CustomerProfileModal 
         open={!!selectedCustomer} 
