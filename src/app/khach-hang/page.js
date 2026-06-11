@@ -197,6 +197,14 @@ export default function KhachHangPage() {
     );
   }, [customers, search]);
 
+  const totalCoc = useMemo(() =>
+    customers.reduce((sum, c) => sum + (Number(c.tienCoc) || 0), 0)
+  , [customers]);
+
+  const filteredCoc = useMemo(() =>
+    filtered.reduce((sum, c) => sum + (Number(c.tienCoc) || 0), 0)
+  , [filtered]);
+
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] p-6 transition-colors duration-150">
       <div className="w-full">
@@ -240,7 +248,27 @@ export default function KhachHangPage() {
           )}
         </div>
 
-        {/* Loading */}
+        {/* Stats tổng tiền cọc */}
+        {!loading && !error && customers.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4">
+              <p className="text-xs text-[var(--text-secondary)] font-semibold uppercase tracking-wider mb-1">Tổng khách hàng</p>
+              <p className="text-2xl font-bold text-[var(--text-primary)]">{customers.length}</p>
+              {search && <p className="text-xs text-[var(--text-secondary)] mt-0.5">Lọc: {filtered.length}</p>}
+            </div>
+            <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 p-4">
+              <p className="text-xs text-orange-400 font-semibold uppercase tracking-wider mb-1">Tổng tiền cọc</p>
+              <p className="text-xl font-bold text-orange-500">{new Intl.NumberFormat('vi-VN').format(totalCoc)} đ</p>
+              {search && filteredCoc !== totalCoc && <p className="text-xs text-orange-400 mt-0.5">Lọc: {new Intl.NumberFormat('vi-VN').format(filteredCoc)} đ</p>}
+            </div>
+            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-card)] p-4 hidden sm:block">
+              <p className="text-xs text-[var(--text-secondary)] font-semibold uppercase tracking-wider mb-1">TB tiền cọc</p>
+              <p className="text-xl font-bold text-[var(--text-primary)]">{customers.length > 0 ? new Intl.NumberFormat('vi-VN').format(Math.round(totalCoc / customers.length)) : 0} đ</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">/khách hàng</p>
+            </div>
+          </div>
+        )}
+
         {loading && (
           <div className="flex flex-col items-center justify-center gap-4 py-24">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />

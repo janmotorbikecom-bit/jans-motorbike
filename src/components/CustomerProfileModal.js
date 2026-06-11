@@ -62,7 +62,11 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
     e.preventDefault();
     setSaving(true);
     try {
+      // GAS updateKhachHang(originalTenKH, originalBienSo, newData)
+      // Always use original tenKH + bienSo as lookup keys
       await callAPI('updateKhachHang', customer.tenKH, customer.bienSo, formData);
+      // Wait for GAS to commit to Google Sheets before reloading
+      await new Promise(r => setTimeout(r, 1500));
       onSuccess && onSuccess();
       onClose();
     } catch (err) {
