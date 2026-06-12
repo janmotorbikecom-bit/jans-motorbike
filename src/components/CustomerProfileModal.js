@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { callAPI } from '@/lib/api';
 import { getUser, canWrite, canDelete } from '@/lib/auth';
+import MoneyInput from '@/components/MoneyInput';
+import CustomDatePicker from '@/components/CustomDatePicker';
 
 const DANH_MUC_THU = ['Tiền thuê tháng', 'Thuê mới', 'Thuê ngắn', 'Phụ thu', 'Bán xe'];
 const DANH_MUC_CHI = ['Bảo dưỡng', 'Thay phụ tùng', 'Nhiên liệu', 'Sửa chữa', 'Chi phí khác', 'Dịch vụ sửa xe', 'Thuế / phí cầu đường'];
@@ -10,7 +12,7 @@ const DANH_MUC_CHI = ['Bảo dưỡng', 'Thay phụ tùng', 'Nhiên liệu', 'S�
 function formatDate(value) {
   if (!value) return '—';
   const str = String(value).trim();
-  
+
   const match = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
   if (match) {
     const d = match[1].padStart(2, '0');
@@ -31,18 +33,18 @@ function formatDate(value) {
   return str;
 }
 
-export default function CustomerProfileModal({ open, onClose, customer, thuChiData, onSuccess }) {
+export default function CustomerProfileModal({ open, onClose, customer, thuChiData, xeList, onSuccess }) {
   const [activeTab, setActiveTab] = useState('info');
-  
+
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [saving, setSaving] = useState(false);
-  
+
   const [addTcOpen, setAddTcOpen] = useState(false);
-  const [tcForm, setTcForm] = useState({ loai: 'Thu', danhMuc: 'Tiền thuê tháng', soTien: '', ghiChu: '' });
+  const [tcForm, setTcForm] = useState({ loai: 'Thu', danhMuc: 'Tiền thuê tháng', soTien: '', batDau: '', ketThuc: '', ghiChu: '' });
   const [addingTc, setAddingTc] = useState(false);
-  
+
   // Notes state
   const [notes, setNotes] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
@@ -52,36 +54,100 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
   // Files state
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState('');
+  const [localUrls, setLocalUrls] = useState([]);
+
+  useEffect(() => {
+    if (customer) {
+      if (Array.isArray(customer.docs) && customer.docs.length > 0) {
+        setLocalUrls(customer.docs);
+      } else if (customer.giayToUrls) {
+        try {
+          const parsed = JSON.parse(customer.giayToUrls);
+          setLocalUrls(Array.isArray(parsed) ? parsed : []);
+        } catch(e) {
+          setLocalUrls([]);
+        }
+      } else {
+        setLocalUrls([]);
+      }
+    } else {
+      setLocalUrls([]);
+    }
+  }, [customer]);
 
   const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    setUser(getUser());
-    if (open && customer) {
-      setActiveTab('info');
-      setFormData(customer);
-      setIsEditing(false);
-      fetchNotes();
+  async function fetchNotes() {
+    if (!customer) return;
+    setLoadingNotes(true);
+    try {
+      let data = [];
+      try {
+        data = await callAPI('getNotes', customer.tenKH, customer.bienSo);
+      } catch (e) {
+        if (customer.ghiChu) {
+          const parts = customer.ghiChu.split(/(?=\[\d{1,2}\/\d{1,2}\/\d{4}.*?\])/g);
+          parts.forEach(p => {
+             const m = p.match(/^\[(.*?) - (.*?)\]([\s\S]*)$/);
+             if (m) {
+               data.push({ thoiGian: m[1], nguoiTao: m[2], noiDung: m[3].trim() });
+             } else if (p.trim()) {
+               data.push({ thoiGian: '', nguoiTao: 'Ghi chú gốc', noiDung: p.trim() });
+             }
+          });
+        }
+      }
+      setNotes(data || []);
+    } catch (err) {
+      console.error('Lỗi tải ghi chú:', err);
+    } finally {
+      setLoadingNotes(false);
     }
+  }
+
+  useEffect(() => {
+    setTimeout(() => {
+      setUser(getUser());
+      if (open && customer) {
+        setActiveTab('info');
+        setFormData(customer);
+        setIsEditing(false);
+        fetchNotes();
+      }
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, customer]);
 
   const handleUpdate = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      // GAS updateKhachHang(originalTenKH, originalBienSo, newData)
-      // Strip nested objects that GAS cannot write to cells (causes crash/deletion bug)
-      const cleanData = { ...formData };
-      delete cleanData.chuKy;
-      delete cleanData.docs;
-      delete cleanData.stt;
-      // Inject user info so GAS can log who made the edit
-      cleanData.taiKhoan = user?.taiKhoan || 'admin';
-      cleanData.vaiTro = user?.vaiTro || 'Admin';
+      // Whitelist chỉ các field đúng schema KhachHang — tránh field lạ làm GAS crash/overwrite sai row
+      const cleanData = {
+        tenKH: formData.tenKH,
+        bienSo: formData.bienSo,
+        xeThue: formData.xeThue,
+        lienLac: formData.lienLac || formData.sdt || '',
+        giaThue: formData.giaThue,
+        tienCoc: formData.tienCoc,
+        ngayBatDau: formData.ngayBatDau,
+        ngayKetThuc: formData.ngayKetThuc,
+        chiNhanh: formData.chiNhanh,
+        congTacVien: formData.congTacVien,
+        ghiChu: formData.ghiChu,
+      };
 
-      // Always use original tenKH + bienSo as lookup keys
-      await callAPI('updateKhachHang', customer.tenKH, customer.bienSo, cleanData);
-      // Wait for GAS to commit to Google Sheets before reloading
+      if (!cleanData.tenKH || !cleanData.bienSo) {
+        alert('Lỗi: Thiếu tên khách hàng hoặc biển số. Không thể lưu!');
+        setSaving(false);
+        return;
+      }
+
+      // Dùng customer.tenKH và customer.bienSo GỐC để GAS tìm đúng row cần update
+      // cleanData.bienSo là biển số MỚI (xe vừa đổi) sẽ được ghi vào row đó
+      await callAPI('updateKhachHang', customer.tenKH, cleanData);
+
+      // Chờ GAS commit vào Google Sheets trước khi reload
       await new Promise(r => setTimeout(r, 1500));
       onSuccess && onSuccess();
       onClose();
@@ -106,31 +172,39 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
     }
   };
 
-  const fetchNotes = async () => {
-    if (!customer) return;
-    setLoadingNotes(true);
-    try {
-      const res = await callAPI('getKhachHangNotes', customer.tenKH, customer.bienSo);
-      if (res && res.notes) setNotes(res.notes);
-    } catch (e) {
-      console.error('Lỗi lấy ghi chú:', e);
-    } finally {
-      setLoadingNotes(false);
-    }
-  };
-
   const handleAddNote = async () => {
     if (!newNote.trim() || !customer) return;
     setAddingNote(true);
     try {
-      const res = await callAPI('addKhachHangNote', {
+      const now = new Date();
+      const timeStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const author = user?.taiKhoan || 'Admin';
+      
+      const formattedNote = `\n[${timeStr} - ${author}] ${newNote.trim()}`;
+      const updatedGhiChu = customer.ghiChu ? `${customer.ghiChu}${formattedNote}` : formattedNote.trim();
+
+      const cleanData = {
         tenKH: customer.tenKH,
         bienSo: customer.bienSo,
-        loai: 'Ghi chú',
-        noiDung: newNote.trim()
-      });
-      if (res && res.notes) setNotes(res.notes);
+        xeThue: customer.xeThue,
+        lienLac: customer.lienLac || customer.sdt || '',
+        giaThue: customer.giaThue,
+        tienCoc: customer.tienCoc,
+        ngayBatDau: customer.ngayBatDau,
+        ngayKetThuc: customer.ngayKetThuc,
+        chiNhanh: customer.chiNhanh,
+        congTacVien: customer.congTacVien,
+        ghiChu: updatedGhiChu,
+      };
+
+      await callAPI('updateKhachHang', customer.tenKH, cleanData);
+
+      const newNoteObj = { thoiGian: timeStr, nguoiTao: author, noiDung: newNote.trim() };
+      setNotes([...notes, newNoteObj]);
+      customer.ghiChu = updatedGhiChu;
+      
       setNewNote('');
+      onSuccess && onSuccess();
     } catch (e) {
       alert('Lỗi: ' + e.message);
     } finally {
@@ -141,7 +215,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !customer) return;
-    
+
     const compressImage = (f) => new Promise((resolve) => {
       if (!f.type.startsWith('image/')) return resolve({ base64: null, isImage: false });
       const reader = new FileReader();
@@ -180,15 +254,30 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
         base64Data = await readBase64(file);
       }
 
-      await callAPI('uploadFileToDrive', {
-        tenKH: customer.tenKH,
-        bienSo: customer.bienSo,
-        fileName: file.name,
-        mimeType: file.type,
-        base64Data
-      });
-      
-      setUploadMsg('Tải lên thành công! File đã lưu vào thư mục Drive.');
+      const res = await callAPI('uploadFileToDrive', base64Data, file.name, file.type, `${customer.tenKH} - ${customer.bienSo}`);
+
+      if (res && res.fileUrl) {
+        let urls = [];
+        if (Array.isArray(customer.docs)) {
+          urls = [...customer.docs];
+        } else {
+          try {
+            urls = JSON.parse(customer.giayToUrls || '[]');
+            if (!Array.isArray(urls)) urls = [];
+          } catch(e) {
+            urls = [];
+          }
+        }
+        urls.push({ url: res.fileUrl, name: file.name, date: new Date().toISOString() });
+        const newUrlsStr = JSON.stringify(urls);
+        setLocalUrls(urls);
+        
+        const payload = { ...customer, giayToUrls: newUrlsStr };
+        await callAPI('updateKhachHang', customer.tenKH, payload);
+        if (onSuccess) onSuccess();
+      }
+
+      setUploadMsg('Tải lên thành công! File đã lưu vào thư mục Drive và đính kèm vào hồ sơ.');
     } catch (err) {
       setUploadMsg('Lỗi: ' + err.message);
     } finally {
@@ -202,10 +291,10 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
 
   const paymentHistory = (thuChiData || []).filter(r => {
     if (!r.khach && !r.nguoiMua) return false;
-    const ten = (r.khach || r.nguoiMua || '').toLowerCase();
-    const cTen = (customer.tenKH || '').toLowerCase();
-    const b = (r.bienSo || '').toLowerCase();
-    const cB = (customer.bienSo || '').toLowerCase();
+    const ten = String(r.khach || r.nguoiMua || '').toLowerCase();
+    const cTen = String(customer.tenKH || '').toLowerCase();
+    const b = String(r.bienSo || '').toLowerCase();
+    const cB = String(customer.bienSo || '').toLowerCase();
     return (ten === cTen) || (b && cB && b === cB);
   }).sort((a, b) => (parseInt(b.rowNum) || 0) - (parseInt(a.rowNum) || 0));
 
@@ -216,7 +305,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
     try {
       const now = new Date();
       const ngay = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
-      
+
       const payload = {
         ngay,
         loai: tcForm.loai,
@@ -225,15 +314,17 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
         nguoiMua: tcForm.loai === 'Chi' ? customer.tenKH : '',
         bienSo: customer.bienSo || '',
         soTien: tcForm.soTien,
+        batDau: tcForm.batDau,
+        ketThuc: tcForm.ketThuc,
         chiNhanh: customer.chiNhanh || '',
         congTacVien: customer.congTacVien || '',
         ghiChu: tcForm.ghiChu || ''
       };
-      
+
       await callAPI('addThuChi', payload);
-      setTcForm({ loai: 'Thu', danhMuc: 'Tiền thuê tháng', soTien: '', ghiChu: '' });
+      setTcForm({ loai: 'Thu', danhMuc: 'Tiền thuê tháng', soTien: '', batDau: '', ketThuc: '', ghiChu: '' });
       setAddTcOpen(false);
-      onSuccess && onSuccess(); // Tải lại dữ liệu
+      onSuccess && onSuccess();
     } catch (err) {
       alert('Lỗi thêm thu chi: ' + err.message);
     } finally {
@@ -255,14 +346,14 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
           <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '18px' }}>
-            Hồ sơ: <span className="text-orange-500">{customer.tenKH}</span>
+            Hồ sơ: <span className="text-blue-500">{customer.tenKH}</span>
             {customer.isGuest && <span className="ml-2 text-[10px] bg-zinc-500/20 text-zinc-400 px-2 py-0.5 rounded-full uppercase tracking-wider">Khách ngoài / Cũ</span>}
           </span>
           <div className="flex items-center gap-3">
             {!isEditing && !customer.isGuest && (
               <>
                 {canWrite(user) && (
-                  <button onClick={() => setIsEditing(true)} className="text-sm px-3 py-1.5 rounded bg-[var(--bg-hover)] text-[var(--text-primary)] hover:text-orange-500 transition-colors">✏️ Sửa</button>
+                  <button onClick={() => setIsEditing(true)} className="text-sm px-3 py-1.5 rounded bg-[var(--bg-hover)] text-[var(--text-primary)] hover:text-blue-500 transition-colors">✏️ Sửa</button>
                 )}
                 {canDelete(user) && (
                   <button onClick={handleDelete} disabled={saving} className="text-sm px-3 py-1.5 rounded bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-colors">🗑️ Xóa</button>
@@ -284,7 +375,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
             ] : []),
           ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
-              className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === t.id ? 'border-orange-500 text-orange-500' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+              className={`px-4 py-2 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === t.id ? 'border-blue-900 text-blue-500' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
               {t.label}
             </button>
           ))}
@@ -292,7 +383,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
 
         {/* Tab Content */}
         <div className="p-6 overflow-y-auto" style={{ flex: 1 }}>
-          
+
           {/* TAB: INFO */}
           {activeTab === 'info' && (
             <div className="space-y-4">
@@ -305,65 +396,69 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Số điện thoại</label>
-                      <input type="text" value={formData.lienLac || formData.sdt || ''} onChange={e => setFormData({...formData, lienLac: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <input type="text" value={formData.lienLac || formData.sdt || ''} onChange={e => setFormData({ ...formData, lienLac: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Xe thuê <span className="text-red-500">*</span></label>
-                      <select required value={formData.xeThue || ''} onChange={e => {
-                        const val = e.target.value;
-                        const found = xeList?.find(x => x.tenXe === val || x.model === val || x.bienSo === val);
-                        setFormData({...formData, xeThue: val, bienSo: formData.bienSo || found?.bienSo || formData.bienSo, giaThue: formData.giaThue || found?.giaThue || formData.giaThue});
+                      <select required value={formData.bienSo || ''} onChange={e => {
+                        const bienSo = e.target.value;
+                        const found = xeList?.find(x => x.bienSo === bienSo);
+                        setFormData({ ...formData, xeThue: found ? (found.tenXe || found.model || '') : formData.xeThue, bienSo: bienSo, giaThue: formData.giaThue || found?.giaThue || '' });
                       }} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]">
-                        <option value={formData.xeThue}>{formData.xeThue}</option>
-                        {xeList?.filter(x => x.trangThai === 'Trống' && x.tenXe !== formData.xeThue).map(x => (
-                          <option key={x.bienSo} value={x.tenXe || x.model}>{x.tenXe || x.model} ({x.bienSo})</option>
+                        {/* Xe hiện tại - luôn hiển thị dù đang thuê */}
+                        {formData.bienSo && !xeList?.find(x => x.trangThai === 'Trống' && x.bienSo === formData.bienSo) && (
+                          <option value={formData.bienSo}>{formData.xeThue} ({formData.bienSo}) - Đang thuê</option>
+                        )}
+                        {/* Xe trống có thể chọn */}
+                        {xeList?.filter(x => x.trangThai === 'Trống').map(x => (
+                          <option key={x.bienSo} value={x.bienSo}>{x.tenXe || x.model} ({x.bienSo})</option>
                         ))}
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Biển số <span className="text-red-500">*</span></label>
-                      <input readOnly required type="text" value={formData.bienSo || ''} className="w-full bg-[var(--bg-hover)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-secondary)] font-mono uppercase cursor-not-allowed" title="Không thể đổi biển số. Xóa và tạo mới nếu cần đổi." />
+                      <input readOnly required type="text" value={formData.bienSo || ''} className="w-full bg-[var(--bg-hover)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-secondary)] font-mono uppercase cursor-not-allowed" title="Thay đổi biển số bằng cách chọn lại Xe thuê ở trên" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Giá thuê</label>
-                      <input type="number" value={formData.giaThue || ''} onChange={e => setFormData({...formData, giaThue: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <MoneyInput value={formData.giaThue || ''} onChange={e => setFormData({ ...formData, giaThue: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Tiền cọc</label>
-                      <input type="number" value={formData.tienCoc || ''} onChange={e => setFormData({...formData, tienCoc: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <MoneyInput value={formData.tienCoc || ''} onChange={e => setFormData({ ...formData, tienCoc: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Ngày bắt đầu</label>
-                      <input type="text" value={formData.ngayBatDau || ''} onChange={e => setFormData({...formData, ngayBatDau: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <CustomDatePicker value={formData.ngayBatDau || ''} onChange={e => setFormData({ ...formData, ngayBatDau: e.target.value })} />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Ngày kết thúc</label>
-                      <input type="text" value={formData.ngayKetThuc || ''} onChange={e => setFormData({...formData, ngayKetThuc: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <CustomDatePicker value={formData.ngayKetThuc || ''} onChange={e => setFormData({ ...formData, ngayKetThuc: e.target.value })} />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Chi nhánh</label>
-                      <input type="text" value={formData.chiNhanh || ''} onChange={e => setFormData({...formData, chiNhanh: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <input type="text" value={formData.chiNhanh || ''} onChange={e => setFormData({ ...formData, chiNhanh: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium mb-1">Cộng tác viên</label>
-                      <input type="text" value={formData.congTacVien || ''} onChange={e => setFormData({...formData, congTacVien: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                      <input type="text" value={formData.congTacVien || ''} onChange={e => setFormData({ ...formData, congTacVien: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Ghi chú gốc</label>
-                    <textarea value={formData.ghiChu || ''} onChange={e => setFormData({...formData, ghiChu: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" rows="2" />
+                    <textarea value={formData.ghiChu || ''} onChange={e => setFormData({ ...formData, ghiChu: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" rows="2" />
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
                     <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 rounded text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors">Hủy</button>
-                    <button type="submit" disabled={saving} className="px-4 py-2 rounded bg-orange-500 text-white font-medium hover:bg-orange-600 disabled:opacity-50 transition-colors">
+                    <button type="submit" disabled={saving} className="px-4 py-2 rounded bg-blue-900 text-white font-medium hover:bg-blue-950 disabled:opacity-50 transition-colors">
                       {saving ? 'Đang lưu...' : 'Lưu cập nhật'}
                     </button>
                   </div>
@@ -388,15 +483,15 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                   </div>
                   <div>
                     <p className="text-[11px] text-[var(--text-secondary)] font-bold uppercase tracking-wider mb-1">Giá thuê</p>
-                    <p className="font-medium text-orange-500">{new Intl.NumberFormat('vi-VN').format(customer.giaThue || 0)} đ</p>
+                    <p className="font-medium text-blue-500">{new Intl.NumberFormat('vi-VN').format(customer.giaThue || 0)} đ</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-[var(--text-secondary)] font-bold uppercase tracking-wider mb-1">Tiền cọc</p>
-                    <p className="font-medium text-orange-500">{new Intl.NumberFormat('vi-VN').format(customer.tienCoc || 0)} đ</p>
+                    <p className="font-medium text-blue-500">{new Intl.NumberFormat('vi-VN').format(customer.tienCoc || 0)} đ</p>
                   </div>
                   <div>
                     <p className="text-[11px] text-[var(--text-secondary)] font-bold uppercase tracking-wider mb-1">Thời gian thuê</p>
-                    <p className="font-medium text-orange-500 bg-orange-500/10 px-3 py-1.5 rounded inline-flex items-center gap-2">
+                    <p className="font-medium text-blue-500 bg-blue-900/10 px-3 py-1.5 rounded inline-flex items-center gap-2">
                       <span>{formatDate(customer.ngayBatDau)}</span>
                       <span className="text-orange-300">→</span>
                       <span>{formatDate(customer.ngayKetThuc)}</span>
@@ -424,27 +519,27 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
           {activeTab === 'history' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-2">
-                 <h3 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider">Lịch sử thu / chi</h3>
-                 {canWrite(user) && (
-                   <button onClick={() => setAddTcOpen(!addTcOpen)} className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded transition-colors">
-                     {addTcOpen ? 'Hủy' : '+ Thêm Giao Dịch'}
-                   </button>
-                 )}
+                <h3 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider">Lịch sử thu / chi</h3>
+                {canWrite(user) && (
+                  <button onClick={() => setAddTcOpen(!addTcOpen)} className="text-xs bg-blue-900 hover:bg-blue-950 text-white px-3 py-1.5 rounded transition-colors">
+                    {addTcOpen ? 'Hủy' : '+ Thêm Giao Dịch'}
+                  </button>
+                )}
               </div>
 
               {addTcOpen && (
                 <form onSubmit={handleAddThuChi} className="bg-[var(--bg-hover)] p-4 rounded-xl border border-[var(--border)] mb-4 space-y-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs text-[var(--text-secondary)] mb-1">Loại</label>
-                      <select value={tcForm.loai} onChange={e => setTcForm({...tcForm, loai: e.target.value, danhMuc: e.target.value === 'Thu' ? DANH_MUC_THU[0] : DANH_MUC_CHI[0]})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm">
+                      <select value={tcForm.loai} onChange={e => setTcForm({ ...tcForm, loai: e.target.value, danhMuc: e.target.value === 'Thu' ? DANH_MUC_THU[0] : DANH_MUC_CHI[0] })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm">
                         <option value="Thu">Thu</option>
                         <option value="Chi">Chi</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-xs text-[var(--text-secondary)] mb-1">Danh mục</label>
-                      <select required value={tcForm.danhMuc} onChange={e => setTcForm({...tcForm, danhMuc: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm">
+                      <select required value={tcForm.danhMuc} onChange={e => setTcForm({ ...tcForm, danhMuc: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm">
                         {(tcForm.loai === 'Thu' ? DANH_MUC_THU : DANH_MUC_CHI).map(d => (
                           <option key={d} value={d}>{d}</option>
                         ))}
@@ -452,11 +547,19 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                     </div>
                     <div>
                       <label className="block text-xs text-[var(--text-secondary)] mb-1">Số tiền *</label>
-                      <input required type="number" value={tcForm.soTien} onChange={e => setTcForm({...tcForm, soTien: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="100000" />
+                      <MoneyInput required value={tcForm.soTien} onChange={e => setTcForm({ ...tcForm, soTien: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="100000" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-secondary)] mb-1">Từ ngày</label>
+                      <CustomDatePicker value={tcForm.batDau} onChange={e => setTcForm({ ...tcForm, batDau: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[var(--text-secondary)] mb-1">Đến ngày</label>
+                      <CustomDatePicker value={tcForm.ketThuc} onChange={e => setTcForm({ ...tcForm, ketThuc: e.target.value })} />
                     </div>
                     <div>
                       <label className="block text-xs text-[var(--text-secondary)] mb-1">Ghi chú</label>
-                      <input type="text" value={tcForm.ghiChu} onChange={e => setTcForm({...tcForm, ghiChu: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="..." />
+                      <input type="text" value={tcForm.ghiChu} onChange={e => setTcForm({ ...tcForm, ghiChu: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="..." />
                     </div>
                   </div>
                   <div className="flex justify-end pt-1">
@@ -509,18 +612,18 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
           {activeTab === 'notes' && (
             <div className="flex flex-col h-full space-y-4">
               <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={newNote} 
-                  onChange={e => setNewNote(e.target.value)} 
+                <input
+                  type="text"
+                  value={newNote}
+                  onChange={e => setNewNote(e.target.value)}
                   placeholder="Nhập nội dung ghi chú..."
-                  className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
+                  className="flex-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-900"
                   onKeyDown={e => { if (e.key === 'Enter') handleAddNote(); }}
                 />
-                <button 
+                <button
                   onClick={handleAddNote}
                   disabled={addingNote || !newNote.trim()}
-                  className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-orange-600 transition-colors"
+                  className="bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-950 transition-colors"
                 >
                   {addingNote ? 'Đang lưu...' : 'Lưu'}
                 </button>
@@ -535,7 +638,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                   notes.map((n, i) => (
                     <div key={i} className="bg-[var(--bg-card)] border border-[var(--border)] rounded p-3 text-sm">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="font-semibold text-orange-500 text-xs">{n.nguoiTao}</span>
+                        <span className="font-semibold text-blue-500 text-xs">{n.nguoiTao}</span>
                         <span className="text-[10px] text-[var(--text-secondary)]">{n.thoiGian}</span>
                       </div>
                       <p className="text-[var(--text-primary)] whitespace-pre-wrap">{n.noiDung}</p>
@@ -549,7 +652,31 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
           {/* TAB: DOCS */}
           {activeTab === 'docs' && (
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-[var(--border)] hover:border-orange-500 rounded-xl p-8 text-center transition-colors">
+              
+              {(() => {
+                const urls = localUrls;
+                if (urls.length > 0) {
+                  return (
+                    <div className="space-y-2 mb-4">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">Tài liệu đã lưu ({urls.length}):</p>
+                      {urls.map((u, i) => (
+                        <div key={i} className="flex items-center justify-between p-3 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[200px]">{u.name || 'Tài liệu'}</span>
+                            <span className="text-xs text-[var(--text-secondary)]">{formatDate(u.date)}</span>
+                          </div>
+                          <a href={u.url} target="_blank" rel="noreferrer" className="px-3 py-1 bg-blue-500/10 text-blue-500 rounded-md text-xs font-semibold hover:bg-blue-500/20 transition-colors">
+                            Xem / Tải
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              <div className="border-2 border-dashed border-[var(--border)] hover:border-blue-900 rounded-xl p-8 text-center transition-colors">
                 <input type="file" id="file-upload" className="hidden" onChange={handleFileUpload} />
                 <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center justify-center">
                   <svg className="w-10 h-10 text-[var(--text-secondary)] mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -561,7 +688,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
               </div>
 
               {uploading && (
-                <div className="text-center p-3 bg-orange-500/10 text-orange-500 rounded-lg text-sm font-medium animate-pulse">
+                <div className="text-center p-3 bg-blue-900/10 text-blue-500 rounded-lg text-sm font-medium animate-pulse">
                   {uploadMsg || 'Đang xử lý...'}
                 </div>
               )}
@@ -574,7 +701,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
               <div className="bg-[var(--bg-hover)] p-4 rounded-xl border border-[var(--border)] text-sm text-[var(--text-secondary)] mt-4">
                 <p className="font-semibold text-[var(--text-primary)] mb-1">Lưu ý kỹ thuật:</p>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Web đang gọi hàm API <code className="text-orange-500 bg-[var(--bg-card)] px-1 rounded">uploadFileToDrive</code> trên Apps Script của bạn.</li>
+                  <li>Web đang gọi hàm API <code className="text-blue-500 bg-[var(--bg-card)] px-1 rounded">uploadFileToDrive</code> trên Apps Script của bạn.</li>
                   <li>Nếu bạn đã viết sẵn hàm với tên khác (vd: <code>uploadHoSo</code>), vui lòng đổi tên hàm trên Apps Script cho trùng khớp.</li>
                 </ul>
               </div>

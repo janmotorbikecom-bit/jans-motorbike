@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 function parseDate(str) {
   if (!str) return null;
@@ -43,7 +43,17 @@ function formatEngDate(dateObj) {
   return dateObj.toLocaleDateString('en-GB', { month: 'short', day: '2-digit', year: 'numeric' });
 }
 
+function formatViDate(dateObj) {
+  if (!dateObj) return '—';
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const y = dateObj.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
 export default function InvoiceModal({ open, onClose, customer }) {
+  const [lang, setLang] = useState('vi');
+
   const { periods, totalDue, overdueDays, paidPeriodsCount } = useMemo(() => {
     if (!customer) return { periods: [], totalDue: 0, overdueDays: 0, paidPeriodsCount: 0 };
 
@@ -76,7 +86,6 @@ export default function InvoiceModal({ open, onClose, customer }) {
       let currentPeriodStart = new Date(end);
       
       // Generate periods until we cover "today"
-      // If end is in the future, unpaidPeriods will be empty.
       let periodIndex = 1;
       while (currentPeriodStart < today) {
         let currentPeriodEnd = new Date(currentPeriodStart);
@@ -108,6 +117,8 @@ export default function InvoiceModal({ open, onClose, customer }) {
 
   if (!open || !customer) return null;
 
+  const fmtDate = lang === 'vi' ? formatViDate : formatEngDate;
+
   return (
     <div onClick={onClose} style={{
       position: 'fixed', inset: 0, zIndex: 1000,
@@ -122,10 +133,16 @@ export default function InvoiceModal({ open, onClose, customer }) {
         overflow: 'hidden'
       }}>
         
+        {/* Language Toggle */}
+        <div style={{ display: 'flex', gap: '8px', padding: '16px 16px 0', justifyContent: 'center' }}>
+          <button onClick={() => setLang('vi')} style={{ padding: '6px 12px', borderRadius: '8px', background: lang === 'vi' ? '#1e3a8a' : '#f1f5f9', color: lang === 'vi' ? '#fff' : '#64748b', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: 'all 0.2s' }}>Tiếng Việt</button>
+          <button onClick={() => setLang('en')} style={{ padding: '6px 12px', borderRadius: '8px', background: lang === 'en' ? '#1e3a8a' : '#f1f5f9', color: lang === 'en' ? '#fff' : '#64748b', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: 'all 0.2s' }}>English</button>
+        </div>
+
         {/* Printable Area */}
         <div id="invoice-printable" style={{ padding: '16px', color: '#333', overflowY: 'auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-            <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: '900', letterSpacing: '1px', color: '#111' }}>JAN'S MOTORBIKE</h2>
+            <h2 style={{ margin: '0 0 2px', fontSize: '16px', fontWeight: '900', letterSpacing: '1px', color: '#111' }}>JAN&apos;S MOTORBIKE</h2>
             <p style={{ margin: 0, fontSize: '10px', color: '#666' }}>Hồ Chí Minh</p>
           </div>
 
@@ -135,54 +152,66 @@ export default function InvoiceModal({ open, onClose, customer }) {
                 background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', 
                 padding: '2px 10px', borderRadius: '16px', fontSize: '10px', fontWeight: 'bold' 
               }}>
-                ⚠️ OVERDUE {overdueDays} DAYS
+                {lang === 'vi' ? `⚠️ QUÁ HẠN ${overdueDays} NGÀY` : `⚠️ OVERDUE ${overdueDays} DAYS`}
               </span>
             </div>
           )}
 
           <div style={{ background: '#f8fafc', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
-            <p style={{ textAlign: 'center', margin: '0 0 10px', fontSize: '10px', fontWeight: 'bold', color: '#64748b', letterSpacing: '0.5px' }}>CUSTOMER INFORMATION</p>
+            <p style={{ textAlign: 'center', margin: '0 0 10px', fontSize: '10px', fontWeight: 'bold', color: '#64748b', letterSpacing: '0.5px' }}>
+              {lang === 'vi' ? 'THÔNG TIN KHÁCH HÀNG' : 'CUSTOMER INFORMATION'}
+            </p>
             
             <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr', gap: '6px 0', fontSize: '11px' }}>
-              <span style={{ color: '#64748b' }}>Customer</span>
+              <span style={{ color: '#64748b' }}>{lang === 'vi' ? 'Khách hàng' : 'Customer'}</span>
               <span style={{ fontWeight: '600', textAlign: 'right' }}>{customer.tenKH || '—'}</span>
 
-              <span style={{ color: '#64748b' }}>Contact</span>
+              <span style={{ color: '#64748b' }}>{lang === 'vi' ? 'Liên hệ' : 'Contact'}</span>
               <span style={{ fontWeight: '600', textAlign: 'right' }}>{customer.lienLac || customer.sdt || '—'}</span>
 
-              <span style={{ color: '#64748b' }}>Vehicle</span>
+              <span style={{ color: '#64748b' }}>{lang === 'vi' ? 'Xe thuê' : 'Vehicle'}</span>
               <span style={{ fontWeight: '600', textAlign: 'right' }}>{customer.xeThue || '—'}</span>
 
-              <span style={{ color: '#64748b' }}>License Plate</span>
+              <span style={{ color: '#64748b' }}>{lang === 'vi' ? 'Biển số' : 'License Plate'}</span>
               <span style={{ fontWeight: '600', textAlign: 'right' }}>{customer.bienSo || '—'}</span>
 
-              <span style={{ color: '#64748b' }}>Monthly Rent</span>
+              <span style={{ color: '#64748b' }}>{lang === 'vi' ? 'Giá thuê tháng' : 'Monthly Rent'}</span>
               <span style={{ fontWeight: '600', textAlign: 'right' }}>{new Intl.NumberFormat('vi-VN').format(customer.giaThue || 0)} VND</span>
 
-              <span style={{ color: '#64748b' }}>Start Date</span>
-              <span style={{ fontWeight: '600', textAlign: 'right' }}>{formatEngDate(parseDate(customer.ngayBatDau))}</span>
+              <span style={{ color: '#64748b' }}>{lang === 'vi' ? 'Ngày bắt đầu' : 'Start Date'}</span>
+              <span style={{ fontWeight: '600', textAlign: 'right' }}>{fmtDate(parseDate(customer.ngayBatDau))}</span>
 
-              <span style={{ color: '#64748b' }}>End Date</span>
-              <span style={{ fontWeight: '600', textAlign: 'right' }}>{formatEngDate(parseDate(customer.ngayKetThuc))}</span>
+              <span style={{ color: '#64748b' }}>{lang === 'vi' ? 'Ngày kết thúc' : 'End Date'}</span>
+              <span style={{ fontWeight: '600', textAlign: 'right' }}>{fmtDate(parseDate(customer.ngayKetThuc))}</span>
             </div>
           </div>
 
           <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-            <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#16a34a', margin: '0 0 4px' }}>✓ PAID ({paidPeriodsCount} PERIODS)</p>
+            <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#16a34a', margin: '0 0 4px' }}>
+              {lang === 'vi' ? `✓ ĐÃ THANH TOÁN (${paidPeriodsCount} KỲ)` : `✓ PAID (${paidPeriodsCount} PERIODS)`}
+            </p>
             {paidPeriodsCount === 0 ? (
-              <p style={{ fontSize: '11px', fontStyle: 'italic', color: '#94a3b8', margin: 0 }}>No payments made yet</p>
+              <p style={{ fontSize: '11px', fontStyle: 'italic', color: '#94a3b8', margin: 0 }}>
+                {lang === 'vi' ? 'Chưa thanh toán kỳ nào' : 'No payments made yet'}
+              </p>
             ) : (
-              <p style={{ fontSize: '11px', fontStyle: 'italic', color: '#94a3b8', margin: 0 }}>Paid up to {formatEngDate(parseDate(customer.ngayKetThuc))}</p>
+              <p style={{ fontSize: '11px', fontStyle: 'italic', color: '#94a3b8', margin: 0 }}>
+                {lang === 'vi' ? `Đã thanh toán đến ${fmtDate(parseDate(customer.ngayKetThuc))}` : `Paid up to ${fmtDate(parseDate(customer.ngayKetThuc))}`}
+              </p>
             )}
           </div>
 
           <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-            <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#b91c1c', margin: '0' }}>UNPAID ({periods.length} PERIODS)</p>
+            <p style={{ fontSize: '10px', fontWeight: 'bold', color: '#b91c1c', margin: '0' }}>
+              {lang === 'vi' ? `CHƯA THANH TOÁN (${periods.length} KỲ)` : `UNPAID (${periods.length} PERIODS)`}
+            </p>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
             {periods.length === 0 ? (
-              <p style={{ textAlign: 'center', fontSize: '11px', fontStyle: 'italic', color: '#94a3b8', margin: 0 }}>No unpaid periods</p>
+              <p style={{ textAlign: 'center', fontSize: '11px', fontStyle: 'italic', color: '#94a3b8', margin: 0 }}>
+                {lang === 'vi' ? 'Không có nợ' : 'No unpaid periods'}
+              </p>
             ) : periods.map((p, i) => (
               <div key={i} style={{ 
                 background: '#fef2f2', borderLeft: '3px solid #b91c1c', borderRadius: '4px', 
@@ -190,13 +219,13 @@ export default function InvoiceModal({ open, onClose, customer }) {
               }}>
                 <div>
                   <p style={{ margin: 0, fontSize: '10px', color: '#7f1d1d' }}>
-                    Period {p.num}: {formatEngDate(p.start)} → {formatEngDate(p.end)}
+                    {lang === 'vi' ? `Kỳ ${p.num}:` : `Period ${p.num}:`} {fmtDate(p.start)} → {fmtDate(p.end)}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {p.daysLate > 0 && (
                     <span style={{ background: '#fecaca', color: '#991b1b', fontSize: '9px', padding: '2px 4px', borderRadius: '4px' }}>
-                      {p.daysLate}d late
+                      {lang === 'vi' ? `Trễ ${p.daysLate} ngày` : `${p.daysLate}d late`}
                     </span>
                   )}
                   <span style={{ fontWeight: 'bold', color: '#b91c1c', fontSize: '11px' }}>
@@ -212,8 +241,12 @@ export default function InvoiceModal({ open, onClose, customer }) {
             padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' 
           }}>
             <div>
-              <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: 'bold', color: '#7f1d1d' }}>Total Due</p>
-              <p style={{ margin: 0, fontSize: '10px', color: '#16a34a' }}>Paid: 0 VND</p>
+              <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: 'bold', color: '#7f1d1d' }}>
+                {lang === 'vi' ? 'Tổng Nợ' : 'Total Due'}
+              </p>
+              <p style={{ margin: 0, fontSize: '10px', color: '#16a34a' }}>
+                {lang === 'vi' ? 'Đã trả: 0 VND' : 'Paid: 0 VND'}
+              </p>
             </div>
             <div style={{ fontSize: '16px', fontWeight: '900', color: '#dc2626' }}>
               {new Intl.NumberFormat('vi-VN').format(totalDue)} VND
@@ -228,7 +261,7 @@ export default function InvoiceModal({ open, onClose, customer }) {
             padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', 
             background: 'transparent', color: 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer' 
           }}>
-            Đóng
+            {lang === 'vi' ? 'Đóng' : 'Close'}
           </button>
           <button 
             onClick={() => {
@@ -245,7 +278,7 @@ export default function InvoiceModal({ open, onClose, customer }) {
               display: 'flex', alignItems: 'center', gap: '8px'
             }}
           >
-            🖨️ In / PDF
+            🖨️ {lang === 'vi' ? 'In / PDF' : 'Print / PDF'}
           </button>
         </div>
 

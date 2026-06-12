@@ -56,7 +56,7 @@ export default function XeDaBanPage() {
 
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <p style={{ color: '#f97316', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>JAN&apos;S MOTORBIKE</p>
+        <p style={{ color: '#3b82f6', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>JAN&apos;S MOTORBIKE</p>
         <h1 style={{ color: 'var(--text-primary)', fontSize: '28px', fontWeight: 700, margin: 0 }}>Xe đã bán</h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: '4px 0 0' }}>Lịch sử xe đã giao dịch bán</p>
       </div>
@@ -66,7 +66,7 @@ export default function XeDaBanPage() {
         {[
           { label: 'Tổng xe đã bán', value: tongBan, unit: 'xe', color: '#60a5fa' },
           { label: 'Tổng doanh thu', value: fmtMoney(tongDoanhThu), color: '#22c55e' },
-          { label: 'Tổng giá vốn', value: fmtMoney(tongVon), color: '#f97316' },
+          { label: 'Tổng giá vốn', value: fmtMoney(tongVon), color: '#3b82f6' },
           { label: 'Lợi nhuận', value: fmtMoney(tongLoiNhuan), color: tongLoiNhuan >= 0 ? '#22c55e' : '#ef4444' },
         ].map(card => (
           <div key={card.label} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', transition: 'background-color 0.15s, border-color 0.15s' }}>
@@ -108,7 +108,7 @@ export default function XeDaBanPage() {
       {/* Loading */}
       {loading && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '64px', textAlign: 'center' }}>
-          <div style={{ width: '32px', height: '32px', border: '3px solid #f97316', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+          <div style={{ width: '32px', height: '32px', border: '3px solid #1e3a8a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
           <p style={{ color: 'var(--text-secondary)' }}>Đang tải dữ liệu...</p>
         </div>
       )}
@@ -117,7 +117,7 @@ export default function XeDaBanPage() {
       {!loading && error && (
         <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '32px', textAlign: 'center' }}>
           <p style={{ color: '#fca5a5', marginBottom: '12px' }}>{error}</p>
-          <button onClick={reload} style={{ background: '#f97316', border: 'none', borderRadius: '8px', color: '#fff', padding: '8px 20px', cursor: 'pointer' }}>Thử lại</button>
+          <button onClick={reload} style={{ background: '#1e3a8a', border: 'none', borderRadius: '8px', color: '#fff', padding: '8px 20px', cursor: 'pointer' }}>Thử lại</button>
         </div>
       )}
 
@@ -171,7 +171,7 @@ export default function XeDaBanPage() {
                         </td>
                         <td style={{ padding: '11px 14px', color: 'var(--text-primary)' }}>{r.nguoiMua || r.khach || '—'}</td>
                         <td style={{ padding: '11px 14px', color: 'var(--text-secondary)' }}>{r.chiNhanh || '—'}</td>
-                        <td style={{ padding: '11px 14px', textAlign: 'right', color: '#f97316', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtMoney(giaVon)}</td>
+                        <td style={{ padding: '11px 14px', textAlign: 'right', color: '#3b82f6', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtMoney(giaVon)}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', color: '#60a5fa', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmtMoney(giaBan)}</td>
                         <td style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 700, color: loiNhuan >= 0 ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
                           {loiNhuan >= 0 ? '+' : ''}{fmtMoney(loiNhuan)}

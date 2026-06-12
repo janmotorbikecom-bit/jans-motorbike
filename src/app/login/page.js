@@ -27,7 +27,7 @@ export default function LoginPage() {
       });
       const result = await res.json();
       const userData = result.data?.data || result.data;
-if (result.success && userData?.ten) {
+      if (result.success && userData && (userData.ten || userData.taiKhoan || userData.vaiTro)) {
   saveAuth(userData);
         router.push('/');
         router.refresh();
@@ -51,14 +51,23 @@ if (result.success && userData?.ten) {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{
-            width: '64px', height: '64px',
-            background: 'linear-gradient(135deg, #f97316, #ea580c)',
-            borderRadius: '16px',
+            width: '120px', height: '120px',
+            background: 'linear-gradient(135deg, #051630 0%, #0d215c 30%, #3a155c 65%, #7e1654 100%)',
+            borderRadius: '24px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '32px', margin: '0 auto 16px',
-          }}>🏍️</div>
+            margin: '0 auto 20px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            overflow: 'hidden',
+            padding: '8px'
+          }}>
+            <img 
+              src="/logo.png" 
+              alt="Jan's Motorbike Logo" 
+              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '16px' }}
+            />
+          </div>
           <h1 style={{ color: '#fff', fontSize: '24px', fontWeight: 700, margin: 0 }}>
-            Jan&apos;s Motorbike
+            JAN&apos;S MOTORBIKE
           </h1>
           <p style={{ color: '#64748b', fontSize: '14px', marginTop: '4px' }}>
             Hệ thống quản lý cho thuê xe máy
@@ -134,7 +143,7 @@ if (result.success && userData?.ten) {
               disabled={loading}
               style={{
                 width: '100%', padding: '12px',
-                background: loading ? '#7c3aed80' : 'linear-gradient(135deg, #f97316, #ea580c)',
+                background: loading ? '#7c3aed80' : 'linear-gradient(135deg, #1e3a8a, #172554)',
                 border: 'none', borderRadius: '8px',
                 color: '#fff', fontSize: '15px', fontWeight: 600,
                 cursor: loading ? 'not-allowed' : 'pointer',

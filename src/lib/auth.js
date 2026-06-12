@@ -38,12 +38,12 @@ export function isLoggedIn() {
 
 // Kiểm tra role
 export function isAdmin(user) {
-  const role = (user?.vaiTro || '').toLowerCase();
+  const role = String(user?.vaiTro || '').toLowerCase();
   return role === 'admin' || role.includes('quản trị');
 }
 
 export function canWrite(user) {
-  const role = (user?.vaiTro || '').toLowerCase();
+  const role = String(user?.vaiTro || '').toLowerCase();
   return isAdmin(user) || role.includes('nhân viên') || role.includes('nhan vien');
 }
 

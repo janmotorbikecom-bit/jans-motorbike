@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import CustomerProfileModal from '@/components/CustomerProfileModal';
+import DashboardCharts from '@/components/DashboardCharts';
+import InvoiceModal from '@/components/InvoiceModal';
 
 function fmtMoney(n) {
   if (!n && n !== 0) return '0 đ';
@@ -94,6 +96,7 @@ export default function DashboardPage() {
   const { xe, khachHang, thuChi, xeDaBan, loading, error, reload } = useStore();
   const thisMonth = getThisMonthKey();
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [invoiceCustomer, setInvoiceCustomer] = useState(null);
 
   const today = useMemo(() => {
     const t = new Date();
@@ -125,16 +128,19 @@ export default function DashboardPage() {
       : thuChi.filter(r => (r.danhMuc || '').toLowerCase().includes('bán xe')).length;
 
     // Row 1: Finance stats
+    const isRevenue = (r) => r.loai === 'Thu' && !(r.danhMuc || '').toLowerCase().includes('cọc');
+    const isExpense = (r) => r.loai === 'Chi' && !(r.danhMuc || '').toLowerCase().includes('cọc');
+
     const thuThang = thuChi
-      .filter(r => r.loai === 'Thu' && parseNgayMonthKey(r.ngay) === thisMonth)
+      .filter(r => isRevenue(r) && parseNgayMonthKey(r.ngay) === thisMonth)
       .reduce((s, r) => s + (parseFloat(r.soTien) || 0), 0);
     const chiThang = thuChi
-      .filter(r => r.loai === 'Chi' && parseNgayMonthKey(r.ngay) === thisMonth)
+      .filter(r => isExpense(r) && parseNgayMonthKey(r.ngay) === thisMonth)
       .reduce((s, r) => s + (parseFloat(r.soTien) || 0), 0);
     const loiNhuanThang = thuThang - chiThang;
 
     const thuToanThoiGian = thuChi
-      .filter(r => r.loai === 'Thu')
+      .filter(isRevenue)
       .reduce((s, r) => s + (parseFloat(r.soTien) || 0), 0);
 
     return {
@@ -188,7 +194,7 @@ export default function DashboardPage() {
         <div className="text-center">
           <p className="text-red-500 font-medium mb-2">Không thể tải dữ liệu</p>
           <p className="text-[var(--text-secondary)] text-sm mb-4">{error}</p>
-          <button onClick={reload} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">
+          <button onClick={reload} className="bg-blue-900 hover:bg-blue-950 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors">
             Thử lại
           </button>
         </div>
@@ -201,7 +207,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="mb-8 flex items-start justify-between">
         <div>
-          <p className="text-orange-500 text-sm font-semibold mb-1">JAN&apos;S MOTORBIKE</p>
+          <p className="text-blue-500 text-sm font-semibold mb-1">JAN&apos;S MOTORBIKE</p>
           <h1 className="text-3xl font-bold">Tổng quan</h1>
           <p className="text-[var(--text-secondary)] text-sm mt-1">
             Tháng {thisMonth} · {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -265,6 +271,118 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Charts ───────────────────────────────────────────────────────────── */}
+      {!loading && thuChi.length > 0 && <DashboardCharts thuChi={thuChi} />}
+
+      {/* ── Customer status section (Elevated) ───────────────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">⚠️ Cảnh báo khách hàng</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* Overdue */}
+          <div className="bg-[var(--bg-card)] border-2 border-red-500/50 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(239,68,68,0.1)] transition-colors relative">
+            {daQuaHan.length > 0 && <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/10 blur-3xl rounded-full" />}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-red-500/20 bg-red-500/5 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="flex h-3 w-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" />
+                <h3 className="text-sm font-bold text-red-500 uppercase">Khách đã quá hạn</h3>
+              </div>
+              <span className="text-xs font-bold bg-red-500 text-white px-2 py-0.5 rounded-full shadow-sm">
+                {loading ? '...' : daQuaHan.length} hợp đồng
+              </span>
+            </div>
+            {loading ? (
+              <div className="p-5 space-y-3">
+                <div className="h-10 bg-[var(--bg-hover)] rounded animate-pulse" />
+              </div>
+            ) : daQuaHan.length === 0 ? (
+              <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
+                Không có khách hàng nào đã quá hạn hợp đồng 🎉
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto relative z-10 bg-[var(--bg-card)]">
+                {daQuaHan.map((k, i) => {
+                  const diff = getDaysDiff(k.ngayKetThuc);
+                  return (
+                    <div key={i} onClick={() => setSelectedCustomer(k)} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-[var(--text-primary)] truncate">{k.tenKH || '—'}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{k.xeThue} · {k.bienSo}</p>
+                      </div>
+                      <div className="ml-4 flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setInvoiceCustomer(k); }}
+                            className="px-2 py-1 bg-blue-500/10 text-blue-500 rounded text-xs font-bold hover:bg-blue-500 hover:text-white transition-colors"
+                          >
+                            INVOICE
+                          </button>
+                          <span className="text-xs font-bold px-2 py-1 rounded-md bg-red-500/10 text-red-500 border border-red-500/20">
+                            Trễ {Math.abs(diff)} ngày
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-semibold text-[var(--text-secondary)] mt-1">Hết hạn: {k.ngayKetThuc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Expiring Soon */}
+          <div className="bg-[var(--bg-card)] border-2 border-amber-500/50 rounded-2xl overflow-hidden shadow-[0_0_15px_rgba(245,158,11,0.1)] transition-colors relative">
+            {sapHetHan.length > 0 && <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-3xl rounded-full" />}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-amber-500/20 bg-amber-500/5 relative z-10">
+              <div className="flex items-center gap-2">
+                <span className="flex h-3 w-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)] animate-pulse" />
+                <h3 className="text-sm font-bold text-amber-500 uppercase">Sắp hết hạn (7 ngày tới)</h3>
+              </div>
+              <span className="text-xs font-bold bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-sm">
+                {loading ? '...' : sapHetHan.length} hợp đồng
+              </span>
+            </div>
+            {loading ? (
+              <div className="p-5 space-y-3">
+                <div className="h-10 bg-[var(--bg-hover)] rounded animate-pulse" />
+              </div>
+            ) : sapHetHan.length === 0 ? (
+              <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
+                Không có hợp đồng nào sắp hết hạn trong 7 ngày tới.
+              </div>
+            ) : (
+              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto relative z-10 bg-[var(--bg-card)]">
+                {sapHetHan.map((k, i) => {
+                  const diff = getDaysDiff(k.ngayKetThuc);
+                  return (
+                    <div key={i} onClick={() => setSelectedCustomer(k)} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--bg-hover)] transition-colors cursor-pointer">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-[var(--text-primary)] truncate">{k.tenKH || '—'}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{k.xeThue} · {k.bienSo}</p>
+                      </div>
+                      <div className="ml-4 flex flex-col items-end gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setInvoiceCustomer(k); }}
+                            className="px-2 py-1 bg-blue-500/10 text-blue-500 rounded text-xs font-bold hover:bg-blue-500 hover:text-white transition-colors"
+                          >
+                            INVOICE
+                          </button>
+                          <span className="text-xs font-bold px-2 py-1 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                            Còn {diff} ngày
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-semibold text-[var(--text-secondary)] mt-1">Hết hạn: {k.ngayKetThuc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* ── Stat cards: Xe (Row 2) ──────────────────────────────────────────────────── */}
       <div className="mb-8">
         <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">🏍️ Đội xe</h2>
@@ -287,7 +405,7 @@ export default function DashboardPage() {
                 label="Xe đang thuê"
                 value={stats.xeThue}
                 sub="đang hoạt động"
-                color="#f97316"
+                color="#1e3a8a"
                 icon="🔑"
                 href="/quan-ly-xe"
               />
@@ -312,105 +430,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Customer status section ───────────────────────────────────────────── */}
-      <div className="mb-8">
-        <h2 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-3">⚠️ Tình trạng khách hàng</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Overdue */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden transition-colors">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-hover)]/30">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2.5 w-2.5 rounded-full bg-red-500 animate-pulse" />
-                <h3 className="text-sm font-semibold">Đã quá hạn</h3>
-              </div>
-              <span className="text-xs font-bold bg-red-500/15 text-red-500 px-2 py-0.5 rounded-full">
-                {loading ? '...' : daQuaHan.length} hợp đồng
-              </span>
-            </div>
-            {loading ? (
-              <div className="p-5 space-y-3">
-                <div className="h-10 bg-[var(--bg-hover)] rounded animate-pulse" />
-                <div className="h-10 bg-[var(--bg-hover)] rounded animate-pulse" />
-              </div>
-            ) : daQuaHan.length === 0 ? (
-              <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
-                Không có khách hàng nào đã quá hạn hợp đồng 🎉
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto">
-                {daQuaHan.map((k, i) => {
-                  const diff = getDaysDiff(k.ngayKetThuc);
-                  return (
-                    <div key={i} onClick={() => setSelectedCustomer(k)} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--bg-hover)]/40 transition-colors cursor-pointer">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{k.tenKH || '—'}</p>
-                        <p className="text-xs text-[var(--text-secondary)]">{k.xeThue} · {k.bienSo}</p>
-                      </div>
-                      <div className="ml-4 text-right">
-                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-500/10 text-red-500">
-                          Trễ {Math.abs(diff)} ngày
-                        </span>
-                        <p className="text-[11px] text-[var(--text-secondary)] mt-1">Hết hạn: {k.ngayKetThuc}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
-          {/* Expiring Soon */}
-          <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden transition-colors">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-hover)]/30">
-              <div className="flex items-center gap-2">
-                <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
-                <h3 className="text-sm font-semibold">Sắp hết hạn (7 ngày tới)</h3>
-              </div>
-              <span className="text-xs font-bold bg-amber-500/15 text-amber-500 px-2 py-0.5 rounded-full">
-                {loading ? '...' : sapHetHan.length} hợp đồng
-              </span>
-            </div>
-            {loading ? (
-              <div className="p-5 space-y-3">
-                <div className="h-10 bg-[var(--bg-hover)] rounded animate-pulse" />
-                <div className="h-10 bg-[var(--bg-hover)] rounded animate-pulse" />
-              </div>
-            ) : sapHetHan.length === 0 ? (
-              <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
-                Không có hợp đồng nào sắp hết hạn trong 7 ngày tới.
-              </div>
-            ) : (
-              <div className="divide-y divide-[var(--border)] max-h-[320px] overflow-y-auto">
-                {sapHetHan.map((k, i) => {
-                  const diff = getDaysDiff(k.ngayKetThuc);
-                  return (
-                    <div key={i} onClick={() => setSelectedCustomer(k)} className="flex items-center justify-between px-5 py-3 hover:bg-[var(--bg-hover)]/40 transition-colors cursor-pointer">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[var(--text-primary)] truncate">{k.tenKH || '—'}</p>
-                        <p className="text-xs text-[var(--text-secondary)]">{k.xeThue} · {k.bienSo}</p>
-                      </div>
-                      <div className="ml-4 text-right">
-                        <span className="text-xs font-bold px-2 py-1 rounded-full bg-amber-500/10 text-amber-500">
-                          Còn {diff} ngày
-                        </span>
-                        <p className="text-[11px] text-[var(--text-secondary)] mt-1">Hết hạn: {k.ngayKetThuc}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-        </div>
-      </div>
 
       {/* ── Bottom grid: recent 10 transactions ─────────────────────────────── */}
       <div className="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl overflow-hidden transition-colors">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <h3 className="text-sm font-semibold">10 Giao dịch mới nhất</h3>
-          <Link href="/thu-chi" className="text-xs text-orange-500 hover:text-orange-600 transition-colors font-medium">
+          <Link href="/thu-chi" className="text-xs text-blue-500 hover:text-blue-600 transition-colors font-medium">
             Xem tất cả →
           </Link>
         </div>
@@ -466,7 +492,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-base">{isThu ? '💚' : '🔴'}</span>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate group-hover:text-orange-500 transition-colors">
+                      <p className="text-sm font-medium truncate group-hover:text-blue-500 transition-colors">
                         {r.khach || r.tenKH || r.tenKhachHang || r.khachHang || r.nguoiMua || r.danhMuc || '—'}
                       </p>
                       <p className="text-xs text-[var(--text-secondary)]">{r.danhMuc} · {r.ngay}</p>
@@ -489,6 +515,12 @@ export default function DashboardPage() {
         customer={selectedCustomer} 
         thuChiData={thuChi} 
         onSuccess={reload}
+      />
+      
+      <InvoiceModal 
+        open={!!invoiceCustomer} 
+        onClose={() => setInvoiceCustomer(null)} 
+        customer={invoiceCustomer} 
       />
 
     </div>

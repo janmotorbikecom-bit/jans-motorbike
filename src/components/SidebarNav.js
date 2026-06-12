@@ -14,12 +14,12 @@ const navItems = [
   {
     href: '/quan-ly-xe',
     label: 'Quản lý xe',
-    icon: <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>,
+    icon: <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="5.5" cy="16.5" r="3.5" strokeWidth={2} /><circle cx="18.5" cy="16.5" r="3.5" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 6a3 3 0 00-3 3H7m4.5 3L8 15m4-3l2.5-6h3" /></svg>,
   },
   {
     href: '/khach-hang',
     label: 'Khách hàng',
-    icon: <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+    icon: <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 13a3 3 0 100-6 3 3 0 000 6z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21v-2a5 5 0 0110 0v2" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 10a2 2 0 100-4 2 2 0 000 4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2 17v-1a4 4 0 014-3.87" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 10a2 2 0 100-4 2 2 0 000 4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M22 17v-1a4 4 0 00-4-3.87" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>,
   },
   {
     href: '/thu-chi',
@@ -34,8 +34,8 @@ const navItems = [
 ];
 
 function getRoleBadge(vaiTro) {
-  const r = (vaiTro||'').toLowerCase();
-  if (r === 'admin' || r.includes('quản trị')) return { label: 'Admin', color: '#f97316' };
+  const r = String(vaiTro||'').toLowerCase();
+  if (r === 'admin' || r.includes('quản trị')) return { label: 'Admin', color: '#3b82f6' };
   if (r.includes('nhân viên') || r.includes('nhan vien')) return { label: 'Nhân viên', color: '#22c55e' };
   return { label: 'Chỉ xem', color: '#64748b' };
 }
@@ -50,18 +50,20 @@ export default function SidebarNav() {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    setUser(getUser());
-    const savedTheme = localStorage.getItem('jans_theme') || 'dark';
-    setTheme(savedTheme);
-    document.documentElement.className = savedTheme;
-    
-    const savedCollapsed = localStorage.getItem('jans_sidebar_collapsed') === 'true';
-    setIsCollapsed(savedCollapsed);
+    setTimeout(() => {
+      setUser(getUser());
+      const savedTheme = localStorage.getItem('jans_theme') || 'dark';
+      setTheme(savedTheme);
+      document.documentElement.className = savedTheme;
+      
+      const savedCollapsed = localStorage.getItem('jans_sidebar_collapsed') === 'true';
+      setIsCollapsed(savedCollapsed);
 
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+      const checkMobile = () => setIsMobile(window.innerWidth < 768);
+      checkMobile();
+      window.addEventListener('resize', checkMobile);
+    }, 0);
+    return () => window.removeEventListener('resize', () => setIsMobile(window.innerWidth < 768));
   }, []);
 
   useEffect(() => {
@@ -106,7 +108,7 @@ export default function SidebarNav() {
       {isMobile && !isMobileOpen && (
         <button 
           onClick={() => setIsMobileOpen(true)}
-          className="fixed bottom-6 right-6 z-40 bg-orange-500 text-white p-4 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] hover:bg-orange-600 transition-transform active:scale-95"
+          className="fixed bottom-6 right-6 z-40 bg-blue-900 text-white p-4 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.3)] hover:bg-blue-950 transition-transform active:scale-95"
         >
           <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
         </button>
@@ -155,13 +157,13 @@ export default function SidebarNav() {
           <div style={{ display: 'none', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
             <div style={{
               width: '36px', height: '36px',
-              background: 'linear-gradient(135deg, #f97316, #ea580c)',
+              background: 'linear-gradient(135deg, #1e3a8a, #172554)',
               borderRadius: '10px', display: 'flex', alignItems: 'center',
               justifyContent: 'center', fontSize: '18px', flexShrink: 0,
             }}>🏍️</div>
             {(isMobile || !isCollapsed) && (
               <div style={{ whiteSpace: 'nowrap' }}>
-                <div style={{ fontSize: '10px', color: '#f97316', fontWeight: 600, letterSpacing: '0.1em' }}>JAN&apos;S</div>
+                <div style={{ fontSize: '10px', color: '#3b82f6', fontWeight: 600, letterSpacing: '0.1em' }}>JAN&apos;S</div>
                 <div style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 700, lineHeight: 1.2 }}>MOTORBIKE</div>
               </div>
             )}
@@ -179,8 +181,8 @@ export default function SidebarNav() {
               display: 'flex', alignItems: 'center', gap: '14px',
               padding: '12px 14px', borderRadius: '12px',
               textDecoration: 'none', 
-              background: isActive ? 'var(--bg-active)' : 'transparent',
-              color: isActive ? '#ea580c' : 'var(--text-secondary)',
+              background: isActive ? '#3b82f61a' : 'transparent',
+              color: isActive ? '#3b82f6' : 'var(--text-secondary)',
               fontWeight: isActive ? 600 : 500,
               transition: 'all 0.2s',
               justifyContent: (!isMobile && isCollapsed) ? 'center' : 'flex-start'

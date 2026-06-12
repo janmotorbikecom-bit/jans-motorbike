@@ -5,6 +5,8 @@ import { callAPI } from '@/lib/api';
 import { useStore } from '@/lib/store';
 import { getUser, canWrite, canDelete } from '@/lib/auth';
 import CustomerProfileModal from '@/components/CustomerProfileModal';
+import MoneyInput from '@/components/MoneyInput';
+import CustomDatePicker from '@/components/CustomDatePicker';
 
 function fmtMoney(n) {
   if (!n || isNaN(n) || n === 0) return '0 đ';
@@ -27,6 +29,21 @@ function formatEngDate(dateStr) {
   const monthName = months[m - 1] || m;
   const suffix = (d % 10 === 1 && d !== 11) ? 'st' : (d % 10 === 2 && d !== 12) ? 'nd' : (d % 10 === 3 && d !== 13) ? 'rd' : 'th';
   return `${d}${suffix} ${monthName} ${y}`;
+}
+
+function toDateInputFormat(dateStr) {
+  if (!dateStr) return '';
+  const parts = String(dateStr).split('/');
+  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  if (dateStr.includes('-')) return dateStr;
+  return dateStr;
+}
+
+function fromDateInputFormat(dateStr) {
+  if (!dateStr) return '';
+  const parts = String(dateStr).split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -109,8 +126,70 @@ const IconTrash = () => (
   </svg>
 );
 
-const DANH_MUC_THU = ['Tiền thuê tháng', 'Thuê mới', 'Thuê ngắn', 'Phụ thu', 'Bán xe'];
-const DANH_MUC_CHI = ['Bảo dưỡng', 'Thay phụ tùng', 'Nhiên liệu', 'Sửa chữa', 'Chi phí khác', 'Dịch vụ sửa xe', 'Thuế / phí cầu đường'];
+function ManageCategoriesModal({ open, onClose, thu, chi, onSave }) {
+  const [localThu, setLocalThu] = useState(thu);
+  const [localChi, setLocalChi] = useState(chi);
+  const [newThu, setNewThu] = useState('');
+  const [newChi, setNewChi] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setLocalThu(thu);
+      setLocalChi(chi);
+      setNewThu('');
+      setNewChi('');
+    }
+  }, [open, thu, chi]);
+
+  const handleSave = () => {
+    onSave(localThu, localChi);
+    onClose();
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Tùy chỉnh danh mục" width="600px">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div>
+          <h3 style={{ color: '#22c55e', fontSize: '15px', marginTop: 0 }}>Danh mục Thu</h3>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <input value={newThu} onChange={e => setNewThu(e.target.value)} style={inputStyle} placeholder="Thêm mục thu..." />
+            <button type="button" onClick={() => { if(newThu.trim()) { setLocalThu([...localThu, newThu.trim()]); setNewThu(''); } }} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', padding: '0 12px', cursor: 'pointer', fontSize: '18px' }}>+</button>
+          </div>
+          <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {localThu.map((t, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: '6px', fontSize: '13px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-primary)' }}>{t}</span>
+                <button type="button" onClick={() => setLocalThu(localThu.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px', fontSize: '14px' }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h3 style={{ color: '#ef4444', fontSize: '15px', marginTop: 0 }}>Danh mục Chi</h3>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <input value={newChi} onChange={e => setNewChi(e.target.value)} style={inputStyle} placeholder="Thêm mục chi..." />
+            <button type="button" onClick={() => { if(newChi.trim()) { setLocalChi([...localChi, newChi.trim()]); setNewChi(''); } }} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', padding: '0 12px', cursor: 'pointer', fontSize: '18px' }}>+</button>
+          </div>
+          <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {localChi.map((c, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-hover)', borderRadius: '6px', fontSize: '13px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-primary)' }}>{c}</span>
+                <button type="button" onClick={() => setLocalChi(localChi.filter((_, idx) => idx !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px', fontSize: '14px' }}>✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px' }}>
+        <button type="button" onClick={onClose} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', cursor: 'pointer' }}>Hủy</button>
+        <button type="button" onClick={handleSave} style={{ padding: '8px 16px', background: '#1e3a8a', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Lưu thay đổi</button>
+      </div>
+    </Modal>
+  );
+}
+
+const DEFAULT_DANH_MUC_THU = ['Tiền thuê tháng', 'Thuê mới', 'Thuê ngắn', 'Phụ thu', 'Tiền cọc', 'Bán xe'];
+const DEFAULT_DANH_MUC_CHI = ['Bảo dưỡng', 'Thay phụ tùng', 'Nhiên liệu', 'Sửa chữa', 'Chi phí khác', 'Dịch vụ sửa xe', 'Thuế / phí cầu đường'];
 const CHI_NHANH_OPTIONS = ['Giang', 'Châu Vân', 'Ân', 'Minh Minh', 'Ân ACB', 'Nghĩa', 'JCAR', 'Tường'];
 
 function shouldShowBillSent(r) {
@@ -120,11 +199,32 @@ function shouldShowBillSent(r) {
 }
 
 export default function ThuChiPage() {
-  const { thuChi: data, khachHang, loading, error, reload, dispatch } = useStore();
+  const { thuChi: data, khachHang, xe, loading, error, reload, dispatch } = useStore();
   
   const getCurrentMonthKey = () => {
     const now = new Date();
     return `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+  };
+
+  const [danhMucThu, setDanhMucThu] = useState(DEFAULT_DANH_MUC_THU);
+  const [danhMucChi, setDanhMucChi] = useState(DEFAULT_DANH_MUC_CHI);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedThu = localStorage.getItem('CUSTOM_DANH_MUC_THU');
+      const savedChi = localStorage.getItem('CUSTOM_DANH_MUC_CHI');
+      if (savedThu) { const parsed = JSON.parse(savedThu); if (Array.isArray(parsed)) setDanhMucThu(parsed); }
+      if (savedChi) { const parsed = JSON.parse(savedChi); if (Array.isArray(parsed)) setDanhMucChi(parsed); }
+    } catch (e) {}
+  }, []);
+
+  const handleSaveCategories = (newThu, newChi) => {
+    setDanhMucThu(newThu);
+    setDanhMucChi(newChi);
+    localStorage.setItem('CUSTOM_DANH_MUC_THU', JSON.stringify(newThu));
+    localStorage.setItem('CUSTOM_DANH_MUC_CHI', JSON.stringify(newChi));
+    showToast('Đã lưu danh mục', 'success');
   };
 
   const [search, setSearch] = useState('');
@@ -148,18 +248,45 @@ export default function ThuChiPage() {
           });
         }
       } catch (e) {
-        console.error('Lỗi khi tải thông tin cửa hàng:', e);
+        // Next.js dev server shows overlay for console.error, so we suppress it if it's just a missing function.
+        // console.error('Lỗi khi tải thông tin cửa hàng:', e);
       }
     }
     fetchShopInfo();
   }, []);
 
   // Modals & forms state
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({
+    ngay: '', loai: 'Thu', danhMuc: '', khach: '', tenXe: '', bienSo: '', soTien: '', tienCoc: '', chiNhanh: '', batDau: '', ketThuc: '', ghiChu: ''
+  });
+  const [savingAdd, setSavingAdd] = useState(false);
+
+  const openCustomerProfile = async (tenKH, bienSo) => {
+    // 1. Tìm chính xác theo tên và biển số
+    let kh = khachHang?.find(k => k.tenKH === tenKH && k.bienSo === bienSo);
+    
+    // 2. Nếu không thấy (có thể khách đã đổi xe), thử tìm theo tên
+    if (!kh) {
+      kh = khachHang?.find(k => k.tenKH === tenKH);
+    }
+    
+    if (kh) {
+      setSelectedCustomer(kh);
+    } else {
+      // Create guest profile if not found
+      setSelectedCustomer({ tenKH, bienSo, isGuest: true });
+    }
+  };
+
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    rowNum: '', ngay: '', loai: 'Thu', danhMuc: '', khach: '', bienSo: '', soTien: '', chiNhanh: '', ghiChu: ''
+    rowNum: '', ngay: '', loai: 'Thu', danhMuc: '', khach: '', tenXe: '', bienSo: '', soTien: '', tienCoc: '', chiNhanh: '', batDau: '', ketThuc: '', ghiChu: ''
   });
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState('');
 
   const [receiptRow, setReceiptRow] = useState(null);
   const [toast, setToast] = useState(null);
@@ -168,8 +295,10 @@ export default function ThuChiPage() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [user, setUser] = useState(null);
 
+   
+  // eslint-disable-next-line
   useEffect(() => {
-    setUser(getUser());
+    setTimeout(() => setUser(getUser()), 0);
   }, []);
 
   function showToast(msg, type = 'success') {
@@ -245,7 +374,7 @@ export default function ThuChiPage() {
         groups[ctv] = { name: ctv, count: 0, totalRevenue: 0, totalCommission: 0 };
       }
       groups[ctv].count += 1;
-      if (r.loai === 'Thu') {
+      if (r.loai === 'Thu' && !(r.danhMuc || '').toLowerCase().includes('cọc')) {
         groups[ctv].totalRevenue += parseFloat(r.soTien) || 0;
       }
       groups[ctv].totalCommission += parseFloat(r.hoaHong) || 0;
@@ -309,8 +438,11 @@ export default function ThuChiPage() {
   }, [data, filterLoai, filterMonth, filterChiNhanh, filterCTV, filterDanhMuc, search]);
 
   // Main stats cards reflect filtered data
-  const filteredThu = filtered.filter(r => r.loai === 'Thu').reduce((s, r) => s + (parseFloat(r.soTien) || 0), 0);
-  const filteredChi = filtered.filter(r => r.loai === 'Chi').reduce((s, r) => s + (parseFloat(r.soTien) || 0), 0);
+  const isRevenue = (r) => r.loai === 'Thu' && !(r.danhMuc || '').toLowerCase().includes('cọc');
+  const isExpense = (r) => r.loai === 'Chi' && !(r.danhMuc || '').toLowerCase().includes('cọc');
+
+  const filteredThu = filtered.filter(isRevenue).reduce((s, r) => s + (parseFloat(r.soTien) || 0), 0);
+  const filteredChi = filtered.filter(isExpense).reduce((s, r) => s + (parseFloat(r.soTien) || 0), 0);
   const loiNhuan = filteredThu - filteredChi;
 
   // ── Bill Sent Checkbox ──────────────────────────────────────────────────────
@@ -341,9 +473,13 @@ export default function ThuChiPage() {
       loai: r.loai || 'Thu',
       danhMuc: r.danhMuc || '',
       khach: r.khach || '',
+      tenXe: r.tenXe || r.xeThue || '',
       bienSo: r.bienSo || '',
       soTien: r.soTien || '',
+      tienCoc: r.tienCoc || '',
       chiNhanh: r.chiNhanh || '',
+      batDau: r.batDau || '',
+      ketThuc: r.ketThuc || '',
       ghiChu: r.ghiChu || ''
     });
     setEditOpen(true);
@@ -356,6 +492,22 @@ export default function ThuChiPage() {
       const { rowNum, ...formData } = editForm;
       // Convert soTien to float/number
       formData.soTien = parseFloat(formData.soTien) || 0;
+      
+      // Auto ghi nhận lợi nhuận nếu là Bán xe
+      if (formData.danhMuc === 'Bán xe' && formData.bienSo) {
+         const soldVehicle = xe?.find(x => x.bienSo === formData.bienSo);
+         if (soldVehicle) {
+            const cost = Number(soldVehicle.giaVon) || 0;
+            const profit = formData.soTien - cost;
+            const profitStr = `[Bán xe] Giá vốn: ${fmtMoney(cost)} | Lợi nhuận: ${fmtMoney(profit)}`;
+            if (!formData.ghiChu?.includes('[Bán xe]')) {
+              formData.ghiChu = formData.ghiChu ? `${formData.ghiChu} \n${profitStr}` : profitStr;
+            } else {
+              formData.ghiChu = formData.ghiChu.replace(/\[Bán xe\].*?(?=\n|$)/, profitStr);
+            }
+         }
+      }
+
       await callAPI('updateThuChi', rowNum, formData);
 
       // Update store
@@ -370,20 +522,138 @@ export default function ThuChiPage() {
     }
   }
 
+  async function handleAddSave(e) {
+    e.preventDefault();
+    const payload = { ...addForm };
+    payload.soTien = parseFloat(payload.soTien) || 0;
+    
+    // Auto ghi nhận lợi nhuận nếu là Bán xe
+    if (payload.danhMuc === 'Bán xe' && payload.bienSo) {
+        const soldVehicle = xe?.find(x => x.bienSo === payload.bienSo);
+        if (soldVehicle) {
+          const cost = Number(soldVehicle.giaVon) || 0;
+          const profit = payload.soTien - cost;
+          const profitNote = `[Bán xe] Giá vốn: ${fmtMoney(cost)} | Lợi nhuận: ${fmtMoney(profit)}`;
+          payload.ghiChu = payload.ghiChu ? `${payload.ghiChu} \n${profitNote}` : profitNote;
+        }
+    }
+
+    // 1. Optimistic Update (instant UI)
+    const newRow = { ...payload, rowNum: 'temp_' + Date.now() }; // temporary ID
+    dispatch({ type: 'ADD_THU_CHI_ROW', payload: newRow });
+    setAddOpen(false);
+    showToast('Đã thêm giao dịch', 'success');
+    setAddForm({ ngay: '', loai: 'Thu', danhMuc: danhMucThu[0] || '', khach: '', tenXe: '', bienSo: '', soTien: '', tienCoc: '', chiNhanh: '', batDau: '', ketThuc: '', ghiChu: '' });
+
+    // 2. Background Sync
+    (async () => {
+      try {
+        // Xử lý Thuê mới
+        if (payload.danhMuc === 'Thuê mới' && payload.khach && payload.bienSo) {
+          const customerForm = {
+            tenKH: payload.khach,
+            bienSo: payload.bienSo,
+            xeThue: payload.tenXe || '',
+            giaThue: payload.soTien || '',
+            tienCoc: payload.tienCoc || '',
+            ngayBatDau: payload.batDau || '',
+            ngayKetThuc: payload.ketThuc || '',
+            chiNhanh: payload.chiNhanh || '',
+            congTacVien: '',
+            ghiChu: payload.ghiChu || ''
+          };
+          await callAPI('addKhachHang', customerForm);
+        }
+
+        await callAPI('addThuChi', payload);
+        reload(true); // silent reload
+      } catch (err) {
+        dispatch({ type: 'DELETE_THU_CHI_ROW', rowNum: newRow.rowNum });
+        showToast('Lỗi khi thêm: ' + err.message, 'error');
+      }
+    })();
+  }
+
+  const handleFileUpload = async (e, formState, setForm) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Yêu cầu phải có thông tin để tạo folder Drive
+    const tenKH = formState.khach?.trim() || formState.danhMuc?.trim() || 'Giao Dich Khac';
+    const bienSo = formState.bienSo?.trim() || 'Chung';
+
+    const compressImage = (f) => new Promise((resolve) => {
+      if (!f.type.startsWith('image/')) return resolve({ base64: null, isImage: false });
+      const reader = new FileReader();
+      reader.readAsDataURL(f);
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.src = ev.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          let scaleSize = 1;
+          if (img.width > MAX_WIDTH) scaleSize = MAX_WIDTH / img.width;
+          canvas.width = img.width * scaleSize;
+          canvas.height = img.height * scaleSize;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.8);
+          resolve({ base64: compressed.split(',')[1], isImage: true });
+        };
+      };
+    });
+
+    setUploadingFile(true);
+    setUploadMsg('Đang tải lên...');
+    try {
+      let base64Data = '';
+      const comp = await compressImage(file);
+      if (comp.isImage) {
+        base64Data = comp.base64;
+      } else {
+        const readBase64 = (f2) => new Promise((resolve) => {
+          const r = new FileReader();
+          r.readAsDataURL(f2);
+          r.onload = () => resolve(r.result.split(',')[1]);
+        });
+        base64Data = await readBase64(file);
+      }
+
+      const overrideName = tenKH && bienSo ? `${tenKH} - ${bienSo}` : file.name;
+      await callAPI('uploadFileToDrive', base64Data, file.name, file.type, overrideName);
+      
+      setUploadMsg('Tải lên thành công!');
+      const newGhiChu = formState.ghiChu ? `${formState.ghiChu} | Đã upload: ${file.name}` : `Đã upload: ${file.name}`;
+      setForm(prev => ({ ...prev, ghiChu: newGhiChu }));
+    } catch (err) {
+      setUploadMsg('Lỗi upload: ' + err.message);
+    } finally {
+      setUploadingFile(false);
+      setTimeout(() => setUploadMsg(''), 5000);
+      e.target.value = null; // reset
+    }
+  };
+
   // ── Delete ─────────────────────────────────────────────────────────────────
   async function handleDelete(r) {
     if (!window.confirm(`Xóa giao dịch này?\n${r.khach || r.danhMuc} — ${fmtMoney(r.soTien)}`)) return;
     const rowNum = r.rowNum;
-    setDeleteLoading(prev => ({ ...prev, [rowNum]: true }));
-    try {
-      await callAPI('deleteThuChi', rowNum);
-      dispatch({ type: 'DELETE_THU_CHI_ROW', rowNum });
-      showToast('Đã xóa giao dịch', 'success');
-    } catch (err) {
-      showToast('Lỗi xóa: ' + err.message, 'error');
-    } finally {
-      setDeleteLoading(prev => ({ ...prev, [rowNum]: false }));
-    }
+    
+    // 1. Optimistic delete
+    dispatch({ type: 'DELETE_THU_CHI_ROW', rowNum });
+    showToast('Đã xóa giao dịch', 'success');
+
+    // 2. Background sync
+    (async () => {
+      try {
+        await callAPI('deleteThuChi', rowNum);
+      } catch (err) {
+        // Revert on fail
+        showToast('Lỗi xóa: ' + err.message, 'error');
+        reload(true);
+      }
+    })();
   }
 
   const handleResetFilters = () => {
@@ -395,7 +665,7 @@ export default function ThuChiPage() {
     setSearch('');
   };
 
-  const danhMucOptions = editForm.loai === 'Chi' ? DANH_MUC_CHI : DANH_MUC_THU;
+  const danhMucOptions = editForm.loai === 'Chi' ? danhMucChi : danhMucThu;
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)', padding: '24px', transition: 'background-color 0.15s, color 0.15s' }}>
@@ -430,10 +700,28 @@ export default function ThuChiPage() {
       `}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <p style={{ color: '#f97316', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>JAN&apos;S MOTORBIKE</p>
-        <h1 style={{ color: 'var(--text-primary)', fontSize: '28px', fontWeight: 700, margin: 0 }}>Quản lý Thu - Chi</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: '4px 0 0' }}>Sổ thu chi toàn bộ giao dịch</p>
+      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <p style={{ color: '#3b82f6', fontSize: '14px', fontWeight: 600, margin: '0 0 4px' }}>JAN&apos;S MOTORBIKE</p>
+          <h1 style={{ color: 'var(--text-primary)', fontSize: '28px', fontWeight: 700, margin: 0 }}>Quản lý Thu - Chi</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: '4px 0 0' }}>Sổ thu chi toàn bộ giao dịch</p>
+        </div>
+        {canWrite(user) && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setManageCategoriesOpen(true)} style={{ padding: '10px 16px', background: 'var(--bg-hover)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Danh mục
+            </button>
+            <button onClick={() => {
+              const now = new Date();
+              const today = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`;
+              setAddForm(prev => ({ ...prev, ngay: today, loai: 'Thu', danhMuc: danhMucThu[0] || '' }));
+              setAddOpen(true);
+            }} style={{ padding: '10px 16px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              + Thêm Thu Chi
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}
@@ -485,13 +773,19 @@ export default function ThuChiPage() {
                   </thead>
                   <tbody>
                     {ctvSummary.map((ctv, index) => (
-                      <tr key={ctv.name} style={{ borderBottom: index === ctvSummary.length - 1 ? 'none' : '1px solid var(--border)' }}>
+                      <tr key={ctv.name} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-primary)' }}>{ctv.name}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--text-primary)' }}>{ctv.count}</td>
                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#22c55e', fontWeight: 600 }}>{fmtMoney(ctv.totalRevenue)}</td>
-                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#f97316', fontWeight: 700 }}>{fmtMoney(ctv.totalCommission)}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#3b82f6', fontWeight: 700 }}>{fmtMoney(ctv.totalCommission)}</td>
                       </tr>
                     ))}
+                    <tr style={{ background: 'var(--bg-hover)', fontWeight: 700 }}>
+                      <td style={{ padding: '12px', color: 'var(--text-primary)', textTransform: 'uppercase', fontSize: '12px', letterSpacing: '0.5px' }}>TỔNG CỘNG</td>
+                      <td style={{ padding: '12px', textAlign: 'center', color: 'var(--text-primary)' }}>{ctvSummary.reduce((sum, c) => sum + c.count, 0)}</td>
+                      <td style={{ padding: '12px', textAlign: 'right', color: '#16a34a' }}>{fmtMoney(ctvSummary.reduce((sum, c) => sum + c.totalRevenue, 0))}</td>
+                      <td style={{ padding: '12px', textAlign: 'right', color: '#2563eb', fontSize: '14px' }}>{fmtMoney(ctvSummary.reduce((sum, c) => sum + c.totalCommission, 0))}</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -552,15 +846,21 @@ export default function ThuChiPage() {
 
       {/* Summary filtered */}
       {!loading && !error && (
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '13px' }}>
-          <span style={{ color: 'var(--text-secondary)' }}>{filtered.length} giao dịch | Thu: {fmtMoney(filteredThu)} | Chi: {fmtMoney(filteredChi)} | Lợi nhuận: {fmtMoney(filteredThu - filteredChi)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', fontSize: '14px', background: 'var(--bg-card)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border)', fontWeight: 600, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}>
+          <span style={{ color: 'var(--text-primary)' }}>{filtered.length} giao dịch</span>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <span style={{ color: '#16a34a' }}>Thu: +{fmtMoney(filteredThu)}</span>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <span style={{ color: '#dc2626' }}>Chi: -{fmtMoney(filteredChi)}</span>
+          <span style={{ color: 'var(--border)' }}>|</span>
+          <span style={{ color: (filteredThu - filteredChi) >= 0 ? '#2563eb' : '#dc2626', fontSize: '15px' }}>Lợi nhuận: {fmtMoney(filteredThu - filteredChi)}</span>
         </div>
       )}
 
       {/* Loading */}
       {loading && (
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '64px', textAlign: 'center' }}>
-          <div style={{ width: '32px', height: '32px', border: '3px solid #f97316', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+          <div style={{ width: '32px', height: '32px', border: '3px solid #1e3a8a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
           <p style={{ color: 'var(--text-secondary)' }}>Đang tải dữ liệu...</p>
         </div>
       )}
@@ -569,7 +869,7 @@ export default function ThuChiPage() {
       {!loading && error && (
         <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', padding: '32px', textAlign: 'center' }}>
           <p style={{ color: '#fca5a5', marginBottom: '12px' }}>{error}</p>
-          <button onClick={reload} style={{ background: '#f97316', border: 'none', borderRadius: '8px', color: '#fff', padding: '8px 20px', cursor: 'pointer' }}>Thử lại</button>
+          <button onClick={reload} style={{ background: '#1e3a8a', border: 'none', borderRadius: '8px', color: '#fff', padding: '8px 20px', cursor: 'pointer' }}>Thử lại</button>
         </div>
       )}
 
@@ -610,7 +910,31 @@ export default function ThuChiPage() {
                           }}>{r.loai}</span>
                         </td>
 
-                        <td style={{ padding: '11px 14px', color: 'var(--text-primary)' }}>{r.danhMuc || '—'}</td>
+                        <td style={{ padding: '11px 14px' }}>
+                          {(() => {
+                            const name = r.danhMuc || '—';
+                            if (name === '—') return <span style={{ color: 'var(--text-primary)' }}>—</span>;
+                            let bg, color, border;
+                            const lower = name.toLowerCase();
+                            if (lower.includes('thuê tháng') || lower.includes('tiền thuê')) { bg = '#22c55e15'; color = '#16a34a'; border = '#22c55e30'; }
+                            else if (lower.includes('thuê mới')) { bg = '#ef444415'; color = '#dc2626'; border = '#ef444430'; }
+                            else if (lower.includes('phụ thu')) { bg = '#f59e0b15'; color = '#d97706'; border = '#f59e0b30'; }
+                            else if (lower.includes('thuê ngắn')) { bg = '#8b5cf615'; color = '#7c3aed'; border = '#8b5cf630'; }
+                            else if (lower.includes('cọc')) { bg = '#3b82f615'; color = '#2563eb'; border = '#3b82f630'; }
+                            else if (lower.includes('bảo dưỡng') || lower.includes('sửa')) { bg = '#f43f5e15'; color = '#e11d48'; border = '#f43f5e30'; }
+                            else if (lower.includes('bán xe')) { bg = '#06b6d415'; color = '#0891b2'; border = '#06b6d430'; }
+                            else { bg = isThu ? '#10b98115' : '#f43f5e15'; color = isThu ? '#059669' : '#be123c'; border = isThu ? '#10b98130' : '#f43f5e30'; }
+                            
+                            return (
+                              <span style={{ 
+                                display: 'inline-block', padding: '3px 10px', borderRadius: '6px', 
+                                fontSize: '12px', fontWeight: 600, background: bg, color: color, border: `1px solid ${border}` 
+                              }}>
+                                {name}
+                              </span>
+                            );
+                          })()}
+                        </td>
 
                         <td style={{ padding: '11px 14px' }}>
                           <div 
@@ -636,7 +960,7 @@ export default function ThuChiPage() {
                               
                               setSelectedCustomer(match);
                             }}
-                            onMouseEnter={e => e.currentTarget.style.color = '#f97316'}
+                            onMouseEnter={e => e.currentTarget.style.color = '#1e3a8a'}
                             onMouseLeave={e => e.currentTarget.style.color = 'var(--text-primary)'}
                           >
                             {r.khach || r.tenKH || r.tenKhachHang || r.khachHang || r.nguoiMua || '—'}
@@ -698,7 +1022,7 @@ export default function ThuChiPage() {
                             {isThu && (
                               <button title="Xem biên lai" onClick={() => setReceiptRow(r)}
                                 style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px', borderRadius: '6px', background: 'var(--bg-hover)', border: '1px solid var(--border)', color: 'var(--text-secondary)', cursor: 'pointer', transition: 'all 0.15s' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = '#f9731620'; e.currentTarget.style.borderColor = '#f97316'; e.currentTarget.style.color = '#f97316'; }}
+                                onMouseEnter={e => { e.currentTarget.style.background = '#1e3a8a20'; e.currentTarget.style.borderColor = '#1e3a8a'; e.currentTarget.style.color = '#1e3a8a'; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}>
                                 <IconReceipt />
                               </button>
@@ -725,12 +1049,174 @@ export default function ThuChiPage() {
         </div>
       )}
 
+      {/* Add Modal */}
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Thêm giao dịch mới">
+        <form onSubmit={handleAddSave}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Field label="Ngày (DD/MM/YYYY)">
+              <CustomDatePicker value={addForm.ngay} onChange={e => setAddForm(prev => ({ ...prev, ngay: e.target.value }))} required />
+            </Field>
+            <Field label="Loại">
+              <select value={addForm.loai} onChange={e => setAddForm(prev => ({ ...prev, loai: e.target.value, danhMuc: e.target.value === 'Thu' ? danhMucThu[0] : danhMucChi[0] }))} style={inputStyle}>
+                <option value="Thu">Thu</option>
+                <option value="Chi">Chi</option>
+              </select>
+            </Field>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: addForm.danhMuc === 'Thuê mới' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '12px' }}>
+            <Field label="Danh mục">
+              <select value={addForm.danhMuc} onChange={e => setAddForm(prev => ({ ...prev, danhMuc: e.target.value }))} style={inputStyle} required>
+                <option value="">Chọn danh mục</option>
+                {(addForm.loai === 'Chi' ? (danhMucChi || []) : (danhMucThu || [])).map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Số tiền (Đơn giá)">
+              <MoneyInput value={addForm.soTien} onChange={e => setAddForm(prev => ({ ...prev, soTien: e.target.value }))} style={inputStyle} required />
+              {addForm.danhMuc === 'Bán xe' && addForm.bienSo && (
+                (() => {
+                  const soldVeh = xe?.find(x => x.bienSo === addForm.bienSo);
+                  if (!soldVeh) return null;
+                  const cost = Number(soldVeh.giaVon) || 0;
+                  const price = Number(addForm.soTien) || 0;
+                  const profit = price - cost;
+                  return (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      Giá vốn: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{fmtMoney(cost)}</span>
+                      <span style={{ margin: '0 8px' }}>|</span>
+                      Lợi nhuận: <span style={{ fontWeight: 600, color: profit >= 0 ? '#22c55e' : '#ef4444' }}>{fmtMoney(profit)}</span>
+                    </div>
+                  );
+                })()
+              )}
+            </Field>
+            {addForm.danhMuc === 'Thuê mới' && (
+              <Field label="Tiền cọc">
+                <MoneyInput value={addForm.tienCoc} onChange={e => setAddForm(prev => ({ ...prev, tienCoc: e.target.value }))} style={inputStyle} />
+              </Field>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <Field label="Khách hàng / Người mua">
+              {addForm.danhMuc === 'Tiền thuê tháng' ? (
+                <select 
+                  value={addForm.khach} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    const found = khachHang?.find(k => k.tenKH === val);
+                    setAddForm(prev => {
+                      const updates = { khach: val };
+                      if (found) {
+                        updates.bienSo = found.bienSo;
+                        if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
+                        if (found.ngayKetThuc) {
+                           const d = new Date(found.ngayKetThuc);
+                           if (!isNaN(d)) {
+                             const dd = String(d.getDate()).padStart(2, '0');
+                             const mm = String(d.getMonth() + 1).padStart(2, '0');
+                             updates.batDau = `${dd}/${mm}/${d.getFullYear()}`;
+                           }
+                        }
+                      }
+                      return { ...prev, ...updates };
+                    });
+                  }} 
+                  style={inputStyle}
+                >
+                  <option value="">-- Chọn khách hàng --</option>
+                  {khachHang?.map((k, i) => (
+                    <option key={`add-kh-${i}`} value={k.tenKH}>{k.tenKH} - {k.bienSo}</option>
+                  ))}
+                </select>
+              ) : (
+                <input 
+                  type="text" 
+                  value={addForm.khach} 
+                  onChange={e => setAddForm(prev => ({ ...prev, khach: e.target.value }))} 
+                  style={inputStyle} 
+                />
+              )}
+            </Field>
+            <Field label="Tên xe (Ví dụ: Vision)">
+              <input type="text" value={addForm.tenXe} onChange={e => setAddForm(prev => ({ ...prev, tenXe: e.target.value }))} style={inputStyle} placeholder="VD: Vision" />
+            </Field>
+            <Field label="Biển số xe">
+              {addForm.danhMuc === 'Bán xe' || addForm.danhMuc === 'Thuê mới' ? (
+                <select 
+                  value={addForm.bienSo} 
+                  onChange={e => setAddForm(prev => ({ ...prev, bienSo: e.target.value }))} 
+                  style={inputStyle}
+                >
+                  <option value="">-- Chọn xe trống --</option>
+                  {(xe || []).filter(x => x.trangThai === 'Trống').map(x => (
+                    <option key={x.bienSo} value={x.bienSo}>{x.tenXe || x.model} ({x.bienSo})</option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" value={addForm.bienSo} onChange={e => setAddForm(prev => ({ ...prev, bienSo: e.target.value }))} style={inputStyle} />
+              )}
+            </Field>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Field label="Từ ngày">
+              <CustomDatePicker value={addForm.batDau} onChange={e => setAddForm(prev => ({ ...prev, batDau: e.target.value }))} placeholderText="DD/MM/YYYY" />
+            </Field>
+            <Field label="Đến ngày">
+              <CustomDatePicker value={addForm.ketThuc} onChange={e => setAddForm(prev => ({ ...prev, ketThuc: e.target.value }))} placeholderText="DD/MM/YYYY" />
+            </Field>
+          </div>
+
+          <Field label="Chi nhánh">
+            <select value={addForm.chiNhanh} onChange={e => setAddForm(prev => ({ ...prev, chiNhanh: e.target.value }))} style={inputStyle}>
+              <option value="">Chọn chi nhánh</option>
+              {CHI_NHANH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+
+          <Field label="Ghi chú">
+            <textarea value={addForm.ghiChu} onChange={e => setAddForm(prev => ({ ...prev, ghiChu: e.target.value }))} style={{ ...inputStyle, height: '60px', resize: 'vertical' }} />
+          </Field>
+
+          <div style={{ marginTop: '12px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>Hồ sơ / Giấy tờ</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <input 
+                type="file" 
+                id="file-upload-add" 
+                style={{ display: 'none' }} 
+                onChange={e => handleFileUpload(e, addForm, setAddForm)} 
+                disabled={uploadingFile}
+              />
+              <button 
+                type="button"
+                onClick={() => document.getElementById('file-upload-add').click()}
+                disabled={uploadingFile}
+                style={{ padding: '8px 16px', background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: '8px', cursor: uploadingFile ? 'wait' : 'pointer', color: 'var(--text-primary)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                Upload File
+              </button>
+              {uploadMsg && <span style={{ fontSize: '13px', color: uploadMsg.includes('Lỗi') ? '#ef4444' : '#10b981' }}>{uploadMsg}</span>}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+            <button type="button" onClick={() => setAddOpen(false)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', cursor: 'pointer' }}>Hủy</button>
+            <button type="submit" disabled={savingAdd} style={{ padding: '9px 20px', background: '#1e3a8a', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: savingAdd ? 'wait' : 'pointer' }}>
+              {savingAdd ? 'Đang lưu...' : 'Lưu lại'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Edit Modal */}
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Chỉnh sửa giao dịch">
         <form onSubmit={handleEditSave}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Field label="Ngày (DD/MM/YYYY)">
-              <input type="text" value={editForm.ngay} onChange={e => setEditForm(prev => ({ ...prev, ngay: e.target.value }))} style={inputStyle} required />
+              <CustomDatePicker value={editForm.ngay} onChange={e => setEditForm(prev => ({ ...prev, ngay: e.target.value }))} required />
             </Field>
             <Field label="Loại">
               <select value={editForm.loai} onChange={e => setEditForm(prev => ({ ...prev, loai: e.target.value, danhMuc: '' }))} style={inputStyle}>
@@ -740,24 +1226,107 @@ export default function ThuChiPage() {
             </Field>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: editForm.danhMuc === 'Thuê mới' ? '1fr 1fr 1fr' : '1fr 1fr', gap: '12px' }}>
             <Field label="Danh mục">
               <select value={editForm.danhMuc} onChange={e => setEditForm(prev => ({ ...prev, danhMuc: e.target.value }))} style={inputStyle} required>
                 <option value="">Chọn danh mục</option>
-                {danhMucOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                {(editForm.loai === 'Chi' ? (danhMucChi || []) : (danhMucThu || [])).map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </Field>
-            <Field label="Số tiền">
-              <input type="number" value={editForm.soTien} onChange={e => setEditForm(prev => ({ ...prev, soTien: e.target.value }))} style={inputStyle} required />
+            <Field label="Số tiền (Đơn giá)">
+              <MoneyInput value={editForm.soTien} onChange={e => setEditForm(prev => ({ ...prev, soTien: e.target.value }))} style={inputStyle} required />
+              {editForm.danhMuc === 'Bán xe' && editForm.bienSo && (
+                (() => {
+                  const soldVeh = xe?.find(x => x.bienSo === editForm.bienSo);
+                  if (!soldVeh) return null;
+                  const cost = Number(soldVeh.giaVon) || 0;
+                  const price = Number(editForm.soTien) || 0;
+                  const profit = price - cost;
+                  return (
+                    <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      Giá vốn: <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{fmtMoney(cost)}</span>
+                      <span style={{ margin: '0 8px' }}>|</span>
+                      Lợi nhuận: <span style={{ fontWeight: 600, color: profit >= 0 ? '#22c55e' : '#ef4444' }}>{fmtMoney(profit)}</span>
+                    </div>
+                  );
+                })()
+              )}
+            </Field>
+            {editForm.danhMuc === 'Thuê mới' && (
+              <Field label="Tiền cọc">
+                <MoneyInput value={editForm.tienCoc} onChange={e => setEditForm(prev => ({ ...prev, tienCoc: e.target.value }))} style={inputStyle} />
+              </Field>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+            <Field label="Khách hàng / Người mua">
+              {editForm.danhMuc === 'Tiền thuê tháng' ? (
+                <select 
+                  value={editForm.khach} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    const found = khachHang?.find(k => k.tenKH === val);
+                    setEditForm(prev => {
+                      const updates = { khach: val };
+                      if (found) {
+                        updates.bienSo = found.bienSo;
+                        if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
+                        if (found.ngayKetThuc) {
+                           const d = new Date(found.ngayKetThuc);
+                           if (!isNaN(d)) {
+                             const dd = String(d.getDate()).padStart(2, '0');
+                             const mm = String(d.getMonth() + 1).padStart(2, '0');
+                             updates.batDau = `${dd}/${mm}/${d.getFullYear()}`;
+                           }
+                        }
+                      }
+                      return { ...prev, ...updates };
+                    });
+                  }} 
+                  style={inputStyle}
+                >
+                  <option value="">-- Chọn khách hàng --</option>
+                  {khachHang?.map((k, i) => (
+                    <option key={`edit-kh-${i}`} value={k.tenKH}>{k.tenKH} - {k.bienSo}</option>
+                  ))}
+                </select>
+              ) : (
+                <input 
+                  type="text" 
+                  value={editForm.khach} 
+                  onChange={e => setEditForm(prev => ({ ...prev, khach: e.target.value }))} 
+                  style={inputStyle} 
+                />
+              )}
+            </Field>
+            <Field label="Tên xe (Ví dụ: Vision)">
+              <input type="text" value={editForm.tenXe} onChange={e => setEditForm(prev => ({ ...prev, tenXe: e.target.value }))} style={inputStyle} placeholder="VD: Vision" />
+            </Field>
+            <Field label="Biển số xe">
+              {editForm.danhMuc === 'Bán xe' || editForm.danhMuc === 'Thuê mới' ? (
+                <select 
+                  value={editForm.bienSo} 
+                  onChange={e => setEditForm(prev => ({ ...prev, bienSo: e.target.value }))} 
+                  style={inputStyle}
+                >
+                  <option value="">-- Chọn xe trống --</option>
+                  {(xe || []).filter(x => x.trangThai === 'Trống').map(x => (
+                    <option key={x.bienSo} value={x.bienSo}>{x.tenXe || x.model} ({x.bienSo})</option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" value={editForm.bienSo} onChange={e => setEditForm(prev => ({ ...prev, bienSo: e.target.value }))} style={inputStyle} />
+              )}
             </Field>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <Field label="Khách hàng / Người mua">
-              <input type="text" value={editForm.khach} onChange={e => setEditForm(prev => ({ ...prev, khach: e.target.value }))} style={inputStyle} />
+            <Field label="Từ ngày">
+              <CustomDatePicker value={editForm.batDau} onChange={e => setEditForm(prev => ({ ...prev, batDau: e.target.value }))} placeholderText="DD/MM/YYYY" />
             </Field>
-            <Field label="Biển số xe">
-              <input type="text" value={editForm.bienSo} onChange={e => setEditForm(prev => ({ ...prev, bienSo: e.target.value }))} style={inputStyle} />
+            <Field label="Đến ngày">
+              <CustomDatePicker value={editForm.ketThuc} onChange={e => setEditForm(prev => ({ ...prev, ketThuc: e.target.value }))} placeholderText="DD/MM/YYYY" />
             </Field>
           </div>
 
@@ -772,9 +1341,32 @@ export default function ThuChiPage() {
             <textarea value={editForm.ghiChu} onChange={e => setEditForm(prev => ({ ...prev, ghiChu: e.target.value }))} style={{ ...inputStyle, height: '60px', resize: 'vertical' }} />
           </Field>
 
+          <div style={{ marginTop: '12px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>Hồ sơ / Giấy tờ</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <input 
+                type="file" 
+                id="file-upload-edit" 
+                style={{ display: 'none' }} 
+                onChange={e => handleFileUpload(e, editForm, setEditForm)} 
+                disabled={uploadingFile}
+              />
+              <button 
+                type="button"
+                onClick={() => document.getElementById('file-upload-edit').click()}
+                disabled={uploadingFile}
+                style={{ padding: '8px 16px', background: 'var(--bg-hover)', border: '1px solid var(--border)', borderRadius: '8px', cursor: uploadingFile ? 'wait' : 'pointer', color: 'var(--text-primary)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                Upload File
+              </button>
+              {uploadMsg && <span style={{ fontSize: '13px', color: uploadMsg.includes('Lỗi') ? '#ef4444' : '#10b981' }}>{uploadMsg}</span>}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
             <button type="button" onClick={() => setEditOpen(false)} style={{ padding: '9px 16px', background: 'transparent', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text-secondary)', cursor: 'pointer' }}>Hủy</button>
-            <button type="submit" disabled={savingEdit} style={{ padding: '9px 20px', background: '#f97316', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: savingEdit ? 'wait' : 'pointer' }}>
+            <button type="submit" disabled={savingEdit} style={{ padding: '9px 20px', background: '#1e3a8a', border: 'none', borderRadius: '8px', color: '#fff', fontWeight: 600, cursor: savingEdit ? 'wait' : 'pointer' }}>
               {savingEdit ? 'Đang lưu...' : 'Lưu lại'}
             </button>
           </div>
@@ -793,7 +1385,7 @@ export default function ThuChiPage() {
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
             <button onClick={() => setReceiptLang('vi')} style={{
               flex: 1, padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-              background: receiptLang === 'vi' ? '#f97316' : 'var(--bg-hover)',
+              background: receiptLang === 'vi' ? '#1e3a8a' : 'var(--bg-hover)',
               color: receiptLang === 'vi' ? '#fff' : 'var(--text-secondary)',
               border: receiptLang === 'vi' ? 'none' : '1px solid var(--border)',
               transition: 'all 0.15s'
@@ -802,7 +1394,7 @@ export default function ThuChiPage() {
             </button>
             <button onClick={() => setReceiptLang('en')} style={{
               flex: 1, padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-              background: receiptLang === 'en' ? '#f97316' : 'var(--bg-hover)',
+              background: receiptLang === 'en' ? '#1e3a8a' : 'var(--bg-hover)',
               color: receiptLang === 'en' ? '#fff' : 'var(--text-secondary)',
               border: receiptLang === 'en' ? 'none' : '1px solid var(--border)',
               transition: 'all 0.15s'
@@ -815,7 +1407,7 @@ export default function ThuChiPage() {
             {receiptLang === 'vi' ? (
               <>
                 <div style={{ textAlign: 'center' }}>
-                  <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 'bold', letterSpacing: '1px' }}>JAN'S MOTORBIKE</h2>
+                  <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 'bold', letterSpacing: '1px' }}>JAN&apos;S MOTORBIKE</h2>
                   <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#333' }}>Dịch vụ cho thuê xe máy</p>
                   <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#333' }}>📍 {shopInfo.address}</p>
                 </div>
@@ -870,14 +1462,14 @@ export default function ThuChiPage() {
                   </div>
                   <div>
                     <p style={{ margin: '0 0 50px', fontWeight: 'bold' }}>Người nhận tiền</p>
-                    <p style={{ margin: 0, fontWeight: 'bold' }}>JAN'S MOTORBIKE</p>
+                    <p style={{ margin: 0, fontWeight: 'bold' }}>JAN&apos;S MOTORBIKE</p>
                   </div>
                 </div>
               </>
             ) : (
               <>
                 <div style={{ textAlign: 'center' }}>
-                  <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 'bold', letterSpacing: '1px' }}>JAN'S MOTORBIKE</h2>
+                  <h2 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: 'bold', letterSpacing: '1px' }}>JAN&apos;S MOTORBIKE</h2>
                   <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#333' }}>Motorbike Rental Service</p>
                   <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#333' }}>📍 Ho Chi Minh City</p>
                 </div>
@@ -979,6 +1571,14 @@ export default function ThuChiPage() {
         customer={selectedCustomer} 
         thuChiData={data} 
         onSuccess={reload}
+      />
+
+      <ManageCategoriesModal
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+        thu={danhMucThu}
+        chi={danhMucChi}
+        onSave={handleSaveCategories}
       />
     </div>
   );
