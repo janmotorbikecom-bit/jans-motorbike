@@ -1206,7 +1206,15 @@ export default function ThuChiPage() {
               {addForm.danhMuc === 'Bán xe' || addForm.danhMuc === 'Thuê mới' ? (
                 <select 
                   value={addForm.bienSo} 
-                  onChange={e => setAddForm(prev => ({ ...prev, bienSo: e.target.value }))} 
+                  onChange={e => {
+                    const newBienSo = e.target.value;
+                    const selectedXe = xe?.find(x => x.bienSo === newBienSo);
+                    setAddForm(prev => ({ 
+                      ...prev, 
+                      bienSo: newBienSo,
+                      tenXe: selectedXe ? (selectedXe.tenXe || selectedXe.model || prev.tenXe) : prev.tenXe
+                    }));
+                  }} 
                   style={inputStyle}
                 >
                   <option value="">-- Chọn xe trống --</option>
@@ -1400,7 +1408,15 @@ export default function ThuChiPage() {
               {editForm.danhMuc === 'Bán xe' || editForm.danhMuc === 'Thuê mới' ? (
                 <select 
                   value={editForm.bienSo} 
-                  onChange={e => setEditForm(prev => ({ ...prev, bienSo: e.target.value }))} 
+                  onChange={e => {
+                    const newBienSo = e.target.value;
+                    const selectedXe = xe?.find(x => x.bienSo === newBienSo);
+                    setEditForm(prev => ({ 
+                      ...prev, 
+                      bienSo: newBienSo,
+                      tenXe: selectedXe ? (selectedXe.tenXe || selectedXe.model || prev.tenXe) : prev.tenXe
+                    }));
+                  }} 
                   style={inputStyle}
                 >
                   <option value="">-- Chọn xe trống --</option>
