@@ -1203,7 +1203,7 @@ export default function ThuChiPage() {
               <input type="text" value={addForm.tenXe} onChange={e => setAddForm(prev => ({ ...prev, tenXe: e.target.value }))} style={inputStyle} placeholder="VD: Vision" />
             </Field>
             <Field label="Biển số xe">
-              {addForm.danhMuc === 'Bán xe' || addForm.danhMuc === 'Thuê mới' ? (
+              {addForm.danhMuc === 'Bán xe' || addForm.danhMuc === 'Thuê mới' || addForm.danhMuc === 'Thuê ngắn' ? (
                 <select 
                   value={addForm.bienSo} 
                   onChange={e => {
@@ -1405,7 +1405,7 @@ export default function ThuChiPage() {
               <input type="text" value={editForm.tenXe} onChange={e => setEditForm(prev => ({ ...prev, tenXe: e.target.value }))} style={inputStyle} placeholder="VD: Vision" />
             </Field>
             <Field label="Biển số xe">
-              {editForm.danhMuc === 'Bán xe' || editForm.danhMuc === 'Thuê mới' ? (
+              {editForm.danhMuc === 'Bán xe' || editForm.danhMuc === 'Thuê mới' || editForm.danhMuc === 'Thuê ngắn' ? (
                 <select 
                   value={editForm.bienSo} 
                   onChange={e => {
