@@ -33,6 +33,20 @@ function formatDate(value) {
   return str;
 }
 
+function autoCalcKetThuc(soTien, giaThue, batDauStr) {
+  if (!soTien || !giaThue || !batDauStr) return null;
+  const soThang = Math.round(Number(soTien) / Number(giaThue));
+  if (soThang <= 0) return null;
+  const parts = String(batDauStr).split('/');
+  if (parts.length !== 3) return null;
+  const d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
+  if (isNaN(d)) return null;
+  d.setMonth(d.getMonth() + soThang);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 export default function CustomerProfileModal({ open, onClose, customer, thuChiData, xeList, onSuccess }) {
   const [activeTab, setActiveTab] = useState('info');
 
@@ -521,7 +535,27 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider">Lịch sử thu / chi</h3>
                 {canWrite(user) && (
-                  <button onClick={() => setAddTcOpen(!addTcOpen)} className="text-xs bg-blue-900 hover:bg-blue-950 text-white px-3 py-1.5 rounded transition-colors">
+                  <button onClick={() => {
+                    setTcForm(prev => {
+                      let batDauTemp = prev.batDau;
+                      if (!addTcOpen && customer && customer.ngayKetThuc) {
+                         let d;
+                         const parts = String(customer.ngayKetThuc).split('/');
+                         if (parts.length === 3) {
+                            d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
+                         } else {
+                            d = new Date(customer.ngayKetThuc);
+                         }
+                         if (d && !isNaN(d)) {
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            batDauTemp = `${dd}/${mm}/${d.getFullYear()}`;
+                         }
+                      }
+                      return { ...prev, batDau: batDauTemp };
+                    });
+                    setAddTcOpen(!addTcOpen);
+                  }} className="text-xs bg-blue-900 hover:bg-blue-950 text-white px-3 py-1.5 rounded transition-colors">
                     {addTcOpen ? 'Hủy' : '+ Thêm Giao Dịch'}
                   </button>
                 )}
@@ -547,11 +581,31 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                     </div>
                     <div>
                       <label className="block text-xs text-[var(--text-secondary)] mb-1">Số tiền *</label>
-                      <MoneyInput required value={tcForm.soTien} onChange={e => setTcForm({ ...tcForm, soTien: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="100000" />
+                      <MoneyInput required value={tcForm.soTien} onChange={e => {
+                        const val = e.target.value;
+                        setTcForm(prev => {
+                          const updates = { soTien: val };
+                          if (prev.danhMuc === 'Tiền thuê tháng' && customer?.giaThue) {
+                            const newKetThuc = autoCalcKetThuc(val, customer.giaThue, prev.batDau);
+                            if (newKetThuc) updates.ketThuc = newKetThuc;
+                          }
+                          return { ...prev, ...updates };
+                        });
+                      }} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-sm" placeholder="100000" />
                     </div>
                     <div>
                       <label className="block text-xs text-[var(--text-secondary)] mb-1">Từ ngày</label>
-                      <CustomDatePicker value={tcForm.batDau} onChange={e => setTcForm({ ...tcForm, batDau: e.target.value })} />
+                      <CustomDatePicker value={tcForm.batDau} onChange={e => {
+                        const val = e.target.value;
+                        setTcForm(prev => {
+                          const updates = { batDau: val };
+                          if (prev.danhMuc === 'Tiền thuê tháng' && customer?.giaThue && prev.soTien) {
+                            const newKetThuc = autoCalcKetThuc(prev.soTien, customer.giaThue, val);
+                            if (newKetThuc) updates.ketThuc = newKetThuc;
+                          }
+                          return { ...prev, ...updates };
+                        });
+                      }} />
                     </div>
                     <div>
                       <label className="block text-xs text-[var(--text-secondary)] mb-1">Đến ngày</label>

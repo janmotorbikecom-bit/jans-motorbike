@@ -327,13 +327,25 @@ export default function KhachHangPage() {
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
-        (item) =>
-          String(item.tenKH || '').toLowerCase().includes(q) ||
-          String(item.bienSo || '').toLowerCase().includes(q),
+        (item) => {
+          let match = String(item.tenKH || '').toLowerCase().includes(q) ||
+                      String(item.bienSo || '').toLowerCase().includes(q) ||
+                      String(item.xeThue || '').toLowerCase().includes(q);
+          
+          if (!match && xe) {
+            const foundXe = xe.find(x => x.bienSo === item.bienSo);
+            if (foundXe) {
+              match = String(foundXe.hangXe || '').toLowerCase().includes(q) ||
+                      String(foundXe.model || '').toLowerCase().includes(q) ||
+                      String(foundXe.tenXe || '').toLowerCase().includes(q);
+            }
+          }
+          return match;
+        }
       );
     }
     return list;
-  }, [customers, search, filterTrangThai, filterCTV]);
+  }, [customers, search, filterTrangThai, filterCTV, xe]);
 
   const totalCoc = useMemo(() =>
     customers.reduce((sum, c) => sum + (Number(c.tienCoc) || 0), 0)
@@ -409,7 +421,7 @@ export default function KhachHangPage() {
               <input
                 id="kh-search"
                 type="search"
-                placeholder="Tìm theo tên khách hàng hoặc biển số..."
+                placeholder="Tìm theo tên khách, biển số, xe..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] py-3 pl-10 pr-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] outline-none transition focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20"

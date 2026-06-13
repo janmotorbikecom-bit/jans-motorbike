@@ -46,6 +46,20 @@ function fromDateInputFormat(dateStr) {
   return dateStr;
 }
 
+function autoCalcKetThuc(soTien, giaThue, batDauStr) {
+  if (!soTien || !giaThue || !batDauStr) return null;
+  const soThang = Math.round(Number(soTien) / Number(giaThue));
+  if (soThang <= 0) return null;
+  const parts = String(batDauStr).split('/');
+  if (parts.length !== 3) return null;
+  const d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
+  if (isNaN(d)) return null;
+  d.setMonth(d.getMonth() + soThang);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 function Toast({ msg, type }) {
   if (!msg) return null;
@@ -233,6 +247,7 @@ export default function ThuChiPage() {
   const [filterChiNhanh, setFilterChiNhanh] = useState('');
   const [filterCTV, setFilterCTV] = useState('');
   const [filterDanhMuc, setFilterDanhMuc] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
   const [receiptLang, setReceiptLang] = useState('vi'); // 'vi' | 'en'
   const [ctvSummaryOpen, setCtvSummaryOpen] = useState(false);
   const [shopInfo, setShopInfo] = useState({ address: 'Hồ Chí Minh', phone: '090.xxx.xxxx' });
@@ -434,8 +449,16 @@ export default function ThuChiPage() {
         (r.ghiChu || '').toLowerCase().includes(q)
       );
     }
+    
+    list.sort((a, b) => {
+      const dateA = a.ngay ? a.ngay.split('/').reverse().join('') : '';
+      const dateB = b.ngay ? b.ngay.split('/').reverse().join('') : '';
+      if (sortOrder === 'desc') return dateB.localeCompare(dateA);
+      return dateA.localeCompare(dateB);
+    });
+
     return list;
-  }, [data, filterLoai, filterMonth, filterChiNhanh, filterCTV, filterDanhMuc, search]);
+  }, [data, filterLoai, filterMonth, filterChiNhanh, filterCTV, filterDanhMuc, search, sortOrder]);
 
   // Main stats cards reflect filtered data
   const isRevenue = (r) => r.loai === 'Thu' && !(r.danhMuc || '').toLowerCase().includes('cọc');
@@ -880,14 +903,23 @@ export default function ThuChiPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-hover)' }}>
-                  {['Ngày', 'Loại', 'Danh mục', 'Khách / Ghi chú', 'Biển số', 'Chi nhánh', 'CTV', 'HH', 'Số tiền', 'Thao tác'].map(h => (
-                    <th key={h} style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 500, textAlign: h === 'Số tiền' ? 'right' : h === 'Thao tác' ? 'center' : 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                  {['Ngày', 'Loại', 'Danh mục', 'Khách / Ghi chú', 'Thời gian thuê', 'Biển số', 'Chi nhánh', 'CTV', 'HH', 'Số tiền', 'Thao tác'].map(h => (
+                    <th key={h} style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 500, textAlign: h === 'Số tiền' ? 'right' : h === 'Thao tác' ? 'center' : 'left', whiteSpace: 'nowrap' }}>
+                      {h === 'Ngày' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }} onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
+                          {h}
+                          <span style={{ fontSize: '10px', color: 'var(--text-primary)' }}>
+                            {sortOrder === 'desc' ? '▼' : '▲'}
+                          </span>
+                        </div>
+                      ) : h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
+                  <tr><td colSpan={11} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-secondary)' }}>
                     {search || filterLoai || filterMonth ? 'Không tìm thấy giao dịch phù hợp' : 'Chưa có giao dịch nào'}
                   </td></tr>
                 ) : (
@@ -968,9 +1000,19 @@ export default function ThuChiPage() {
                           {r.ghiChu && <div style={{ color: 'var(--text-secondary)', fontSize: '12px', marginTop: '2px' }}>{r.ghiChu}</div>}
                         </td>
 
-                        <td style={{ padding: '11px 14px' }}>
+                        <td style={{ padding: '11px 14px', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                          {r.batDau || r.ketThuc ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>{r.batDau || '—'}</span>
+                              <span style={{ color: 'var(--border)' }}>→</span>
+                              <span>{r.ketThuc || '—'}</span>
+                            </div>
+                          ) : '—'}
+                        </td>
+
+                        <td style={{ padding: '11px 14px', whiteSpace: 'nowrap' }}>
                           {r.bienSo ? (
-                            <span style={{ fontFamily: 'monospace', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text-primary)', border: '1px solid var(--border)', fontSize: '12px' }}>
+                            <span style={{ fontFamily: 'monospace', background: 'var(--bg-hover)', padding: '2px 8px', borderRadius: '4px', color: 'var(--text-primary)', border: '1px solid var(--border)', fontSize: '12px', display: 'inline-block' }}>
                               {r.bienSo}
                             </span>
                           ) : '—'}
@@ -1072,7 +1114,20 @@ export default function ThuChiPage() {
               </select>
             </Field>
             <Field label="Số tiền (Đơn giá)">
-              <MoneyInput value={addForm.soTien} onChange={e => setAddForm(prev => ({ ...prev, soTien: e.target.value }))} style={inputStyle} required />
+              <MoneyInput value={addForm.soTien} onChange={e => {
+                const val = e.target.value;
+                setAddForm(prev => {
+                  const updates = { soTien: val };
+                  if (prev.danhMuc === 'Tiền thuê tháng' && prev.khach) {
+                    const found = khachHang?.find(k => k.tenKH === prev.khach);
+                    if (found && found.giaThue) {
+                      const newKetThuc = autoCalcKetThuc(val, found.giaThue, prev.batDau);
+                      if (newKetThuc) updates.ketThuc = newKetThuc;
+                    }
+                  }
+                  return { ...prev, ...updates };
+                });
+              }} style={inputStyle} required />
               {addForm.danhMuc === 'Bán xe' && addForm.bienSo && (
                 (() => {
                   const soldVeh = xe?.find(x => x.bienSo === addForm.bienSo);
@@ -1099,44 +1154,50 @@ export default function ThuChiPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
             <Field label="Khách hàng / Người mua">
-              {addForm.danhMuc === 'Tiền thuê tháng' ? (
-                <select 
-                  value={addForm.khach} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    const found = khachHang?.find(k => k.tenKH === val);
-                    setAddForm(prev => {
-                      const updates = { khach: val };
-                      if (found) {
-                        updates.bienSo = found.bienSo;
-                        if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
-                        if (found.ngayKetThuc) {
-                           const d = new Date(found.ngayKetThuc);
-                           if (!isNaN(d)) {
-                             const dd = String(d.getDate()).padStart(2, '0');
-                             const mm = String(d.getMonth() + 1).padStart(2, '0');
-                             updates.batDau = `${dd}/${mm}/${d.getFullYear()}`;
-                           }
-                        }
+              <input 
+                list="khachHangList_add"
+                type="text" 
+                value={addForm.khach} 
+                onChange={e => {
+                  const val = e.target.value;
+                  const found = khachHang?.find(k => k.tenKH === val);
+                  setAddForm(prev => {
+                    const updates = { khach: val };
+                    if (found && prev.danhMuc === 'Tiền thuê tháng') {
+                      updates.bienSo = found.bienSo;
+                      if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
+                      let batDauTemp = prev.batDau;
+                      if (found.ngayKetThuc) {
+                         let d;
+                         const parts = String(found.ngayKetThuc).split('/');
+                         if (parts.length === 3) {
+                            d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
+                         } else {
+                            d = new Date(found.ngayKetThuc);
+                         }
+                         if (d && !isNaN(d)) {
+                           const dd = String(d.getDate()).padStart(2, '0');
+                           const mm = String(d.getMonth() + 1).padStart(2, '0');
+                           batDauTemp = `${dd}/${mm}/${d.getFullYear()}`;
+                           updates.batDau = batDauTemp;
+                         }
                       }
-                      return { ...prev, ...updates };
-                    });
-                  }} 
-                  style={inputStyle}
-                >
-                  <option value="">-- Chọn khách hàng --</option>
-                  {khachHang?.map((k, i) => (
-                    <option key={`add-kh-${i}`} value={k.tenKH}>{k.tenKH} - {k.bienSo}</option>
-                  ))}
-                </select>
-              ) : (
-                <input 
-                  type="text" 
-                  value={addForm.khach} 
-                  onChange={e => setAddForm(prev => ({ ...prev, khach: e.target.value }))} 
-                  style={inputStyle} 
-                />
-              )}
+                      if (prev.soTien) {
+                        const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, batDauTemp);
+                        if (newKetThuc) updates.ketThuc = newKetThuc;
+                      }
+                    }
+                    return { ...prev, ...updates };
+                  });
+                }} 
+                style={inputStyle} 
+                placeholder="Nhập hoặc chọn khách..."
+              />
+              <datalist id="khachHangList_add">
+                {khachHang?.map((k, i) => (
+                  <option key={`add-kh-${i}`} value={k.tenKH}>{k.bienSo ? `- ${k.bienSo}` : ''}</option>
+                ))}
+              </datalist>
             </Field>
             <Field label="Tên xe (Ví dụ: Vision)">
               <input type="text" value={addForm.tenXe} onChange={e => setAddForm(prev => ({ ...prev, tenXe: e.target.value }))} style={inputStyle} placeholder="VD: Vision" />
@@ -1161,7 +1222,20 @@ export default function ThuChiPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Field label="Từ ngày">
-              <CustomDatePicker value={addForm.batDau} onChange={e => setAddForm(prev => ({ ...prev, batDau: e.target.value }))} placeholderText="DD/MM/YYYY" />
+              <CustomDatePicker value={addForm.batDau} onChange={e => {
+                const val = e.target.value;
+                setAddForm(prev => {
+                  const updates = { batDau: val };
+                  if (prev.danhMuc === 'Tiền thuê tháng' && prev.khach && prev.soTien) {
+                    const found = khachHang?.find(k => k.tenKH === prev.khach);
+                    if (found && found.giaThue) {
+                      const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, val);
+                      if (newKetThuc) updates.ketThuc = newKetThuc;
+                    }
+                  }
+                  return { ...prev, ...updates };
+                });
+              }} placeholderText="DD/MM/YYYY" />
             </Field>
             <Field label="Đến ngày">
               <CustomDatePicker value={addForm.ketThuc} onChange={e => setAddForm(prev => ({ ...prev, ketThuc: e.target.value }))} placeholderText="DD/MM/YYYY" />
@@ -1234,7 +1308,20 @@ export default function ThuChiPage() {
               </select>
             </Field>
             <Field label="Số tiền (Đơn giá)">
-              <MoneyInput value={editForm.soTien} onChange={e => setEditForm(prev => ({ ...prev, soTien: e.target.value }))} style={inputStyle} required />
+              <MoneyInput value={editForm.soTien} onChange={e => {
+                const val = e.target.value;
+                setEditForm(prev => {
+                  const updates = { soTien: val };
+                  if (prev.danhMuc === 'Tiền thuê tháng' && prev.khach) {
+                    const found = khachHang?.find(k => k.tenKH === prev.khach);
+                    if (found && found.giaThue) {
+                      const newKetThuc = autoCalcKetThuc(val, found.giaThue, prev.batDau);
+                      if (newKetThuc) updates.ketThuc = newKetThuc;
+                    }
+                  }
+                  return { ...prev, ...updates };
+                });
+              }} style={inputStyle} required />
               {editForm.danhMuc === 'Bán xe' && editForm.bienSo && (
                 (() => {
                   const soldVeh = xe?.find(x => x.bienSo === editForm.bienSo);
@@ -1261,44 +1348,50 @@ export default function ThuChiPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
             <Field label="Khách hàng / Người mua">
-              {editForm.danhMuc === 'Tiền thuê tháng' ? (
-                <select 
-                  value={editForm.khach} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    const found = khachHang?.find(k => k.tenKH === val);
-                    setEditForm(prev => {
-                      const updates = { khach: val };
-                      if (found) {
-                        updates.bienSo = found.bienSo;
-                        if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
-                        if (found.ngayKetThuc) {
-                           const d = new Date(found.ngayKetThuc);
-                           if (!isNaN(d)) {
-                             const dd = String(d.getDate()).padStart(2, '0');
-                             const mm = String(d.getMonth() + 1).padStart(2, '0');
-                             updates.batDau = `${dd}/${mm}/${d.getFullYear()}`;
-                           }
-                        }
+              <input 
+                list="khachHangList_edit"
+                type="text" 
+                value={editForm.khach} 
+                onChange={e => {
+                  const val = e.target.value;
+                  const found = khachHang?.find(k => k.tenKH === val);
+                  setEditForm(prev => {
+                    const updates = { khach: val };
+                    if (found && prev.danhMuc === 'Tiền thuê tháng') {
+                      updates.bienSo = found.bienSo;
+                      if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
+                      let batDauTemp = prev.batDau;
+                      if (found.ngayKetThuc) {
+                         let d;
+                         const parts = String(found.ngayKetThuc).split('/');
+                         if (parts.length === 3) {
+                            d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
+                         } else {
+                            d = new Date(found.ngayKetThuc);
+                         }
+                         if (d && !isNaN(d)) {
+                           const dd = String(d.getDate()).padStart(2, '0');
+                           const mm = String(d.getMonth() + 1).padStart(2, '0');
+                           batDauTemp = `${dd}/${mm}/${d.getFullYear()}`;
+                           updates.batDau = batDauTemp;
+                         }
                       }
-                      return { ...prev, ...updates };
-                    });
-                  }} 
-                  style={inputStyle}
-                >
-                  <option value="">-- Chọn khách hàng --</option>
-                  {khachHang?.map((k, i) => (
-                    <option key={`edit-kh-${i}`} value={k.tenKH}>{k.tenKH} - {k.bienSo}</option>
-                  ))}
-                </select>
-              ) : (
-                <input 
-                  type="text" 
-                  value={editForm.khach} 
-                  onChange={e => setEditForm(prev => ({ ...prev, khach: e.target.value }))} 
-                  style={inputStyle} 
-                />
-              )}
+                      if (prev.soTien) {
+                        const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, batDauTemp);
+                        if (newKetThuc) updates.ketThuc = newKetThuc;
+                      }
+                    }
+                    return { ...prev, ...updates };
+                  });
+                }} 
+                style={inputStyle} 
+                placeholder="Nhập hoặc chọn khách..."
+              />
+              <datalist id="khachHangList_edit">
+                {khachHang?.map((k, i) => (
+                  <option key={`edit-kh-${i}`} value={k.tenKH}>{k.bienSo ? `- ${k.bienSo}` : ''}</option>
+                ))}
+              </datalist>
             </Field>
             <Field label="Tên xe (Ví dụ: Vision)">
               <input type="text" value={editForm.tenXe} onChange={e => setEditForm(prev => ({ ...prev, tenXe: e.target.value }))} style={inputStyle} placeholder="VD: Vision" />
@@ -1323,7 +1416,20 @@ export default function ThuChiPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <Field label="Từ ngày">
-              <CustomDatePicker value={editForm.batDau} onChange={e => setEditForm(prev => ({ ...prev, batDau: e.target.value }))} placeholderText="DD/MM/YYYY" />
+              <CustomDatePicker value={editForm.batDau} onChange={e => {
+                const val = e.target.value;
+                setEditForm(prev => {
+                  const updates = { batDau: val };
+                  if (prev.danhMuc === 'Tiền thuê tháng' && prev.khach && prev.soTien) {
+                    const found = khachHang?.find(k => k.tenKH === prev.khach);
+                    if (found && found.giaThue) {
+                      const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, val);
+                      if (newKetThuc) updates.ketThuc = newKetThuc;
+                    }
+                  }
+                  return { ...prev, ...updates };
+                });
+              }} placeholderText="DD/MM/YYYY" />
             </Field>
             <Field label="Đến ngày">
               <CustomDatePicker value={editForm.ketThuc} onChange={e => setEditForm(prev => ({ ...prev, ketThuc: e.target.value }))} placeholderText="DD/MM/YYYY" />

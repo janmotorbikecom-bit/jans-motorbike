@@ -11,6 +11,12 @@ function fmtMoney(n) {
   if (!n && n !== 0) return '0 đ';
   const num = parseFloat(n);
   if (isNaN(num) || num === 0) return '0 đ';
+  if (num >= 1_000_000_000) {
+    let t = (num / 1_000_000_000).toFixed(2);
+    if (t.endsWith('.00')) t = t.slice(0, -3);
+    else if (t.endsWith('0')) t = t.slice(0, -1);
+    return t + ' tỷ';
+  }
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(1).replace('.0', '') + ' tr';
   return new Intl.NumberFormat('vi-VN').format(num) + ' đ';
 }
