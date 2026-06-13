@@ -27,10 +27,13 @@ export async function POST(request) {
     
     try {
       const data = JSON.parse(text);
+      if (!data.success && data.error && data.error.includes('Function not found')) {
+         data.debugApiUrl = API_URL; // Thêm url để debug
+      }
       return NextResponse.json(data);
     } catch {
       console.error('Apps Script trả về:', text.substring(0, 200));
-      return NextResponse.json({ success: false, error: 'Invalid JSON from Apps Script', raw: text.substring(0, 200) }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Invalid JSON from Apps Script', raw: text.substring(0, 200), debugApiUrl: API_URL }, { status: 500 });
     }
 
   } catch (err) {

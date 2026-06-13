@@ -17,7 +17,9 @@ export async function callAPI(fn, ...args) {
   const data = await res.json();
   if (!data.success) throw new Error(data.error);
   if (data.data && typeof data.data === 'object' && data.data.success === false) {
-    throw new Error(data.data.error || 'Lỗi từ máy chủ');
+    let errMsg = data.data.error || 'Lỗi từ máy chủ';
+    if (data.debugApiUrl) errMsg += ` (URL: ${data.debugApiUrl})`;
+    throw new Error(errMsg);
   }
   return data.data;
 }
