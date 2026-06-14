@@ -1028,7 +1028,7 @@ export default function ThuChiPage() {
 
                         <td style={{ padding: '11px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                           {r.danhMuc === 'Bán xe' ? (() => {
-                            const pPrice = Number(r.soTien) || 0;
+                            const pPrice = Number(r.giaBan) || Number(r.soTien) || 0;
                             const pCost = Number(r.giaVon) || 0;
                             const pProfit = pPrice - pCost;
                             return (
