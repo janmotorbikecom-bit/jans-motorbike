@@ -2062,6 +2062,7 @@ function updateBillSentStatus(rowNum, isSent, userInfo) {
             }
         } catch (_lh) { }
 
+        invalidateTCCache_();
         return { success: true, billSent: newVal };
     } catch (e) {
         Logger.log('updateBillSentStatus: ' + e.message);
@@ -2324,13 +2325,16 @@ function getXeDaBanDetail(maBan) {
 
 function getThuChiData(filterLoai, filterMonth, filterBranch, _force) {
     try {
-        // [FIX 2026-06] Tắt CacheService cho TC — đọc thẳng sheet để billSent luôn đúng
         const hasFilter = filterLoai || filterMonth || filterBranch;
-        try { CacheService.getScriptCache().remove(JMB_CACHE.TC_ALL); } catch (_) { }
+        const cache = CacheService.getScriptCache();
+        if (_force) { try { cache.remove(JMB_CACHE.TC_ALL); } catch (_) { } }
+        if (!hasFilter && !_force) {
+            try { const cached = cache.get(JMB_CACHE.TC_ALL); if (cached) return JSON.parse(cached); } catch (_ce) { }
+        }
+
         const ss = SpreadsheetApp.getActiveSpreadsheet();
         const thuSh = getOrCreateThuChiSheet_();
         const chiSh = getOrCreateChiSheet_();
-        // [OPT] Đã tách sync ra khỏi read — chỉ chạy khi thêm/xóa TC, không phải mỗi lần đọc
         const khMap = {};
         const khSh = ss.getSheetByName(CONFIG.SHEET_KH);
         if (khSh) {
@@ -2347,9 +2351,6 @@ function getThuChiData(filterLoai, filterMonth, filterBranch, _force) {
             }
         }
 
-        // [2026-05] Build xeMap: biển số (UPPERCASE) → { tenXe, hangXe } để enrich record TC.
-        // Lookup ưu tiên sheet QL Xe (xe đang hoạt động), fallback sheet Xe Đã Bán cho các giao
-        // dịch lịch sử có biển số đã chuyển khỏi danh sách xe đang cho thuê.
         const xeMap = {};
         try {
             const xeSh = ss.getSheetByName(CONFIG.SHEET_XE);
@@ -2377,7 +2378,6 @@ function getThuChiData(filterLoai, filterMonth, filterBranch, _force) {
                         const bienSo = String(r[TC_CONFIG.SOLD_COL.BIEN_SO] || '').trim();
                         if (!bienSo) return;
                         const up = bienSo.toUpperCase();
-                        // Chỉ điền nếu QL Xe chưa có (ưu tiên xe đang hoạt động)
                         if (xeMap[up]) return;
                         const tenXe = String(r[TC_CONFIG.SOLD_COL.MODEL] || '').trim();
                         const hangXeRaw = String(r[TC_CONFIG.SOLD_COL.HANG_XE] || '').trim();
@@ -2392,33 +2392,25 @@ function getThuChiData(filterLoai, filterMonth, filterBranch, _force) {
         function readSheet_(sh, defaultLoai, rowOffset) {
             const lastRow = sh.getLastRow();
             if (lastRow < TC_CONFIG.TC_START) return;
-            // [FIX 2026-06] Đọc đúng số cột thực tế của sheet.
-            // KHÔNG dùng Math.max vượt quá lastColumn — GAS trả undefined cho cột không tồn tại.
             const _shLastCol = sh.getLastColumn();
-            const _hasBillSent = (_shLastCol >= TC_CONFIG.COL.BILL_SENT + 1); // cột W có tồn tại?
-            const numCols = _shLastCol; // đọc đúng số cột thực tế
+            const _hasBillSent = (_shLastCol >= TC_CONFIG.COL.BILL_SENT + 1);
+            const numCols = _shLastCol;
             const raw = sh.getRange(TC_CONFIG.TC_START, 1, lastRow - TC_CONFIG.TC_START + 1, numCols).getValues();
             raw.forEach((r, idx) => {
                 let loai = String(r[TC_CONFIG.COL.LOAI] || '').trim() || defaultLoai;
                 const soTien = parseMoneyValue(r[TC_CONFIG.COL.SO_TIEN]);
                 const danhMucRaw = String(r[TC_CONFIG.COL.DANH_MUC] || '').trim();
                 if (!loai) return;
-                // [FIX 2026-05] Cho phép 'Bán xe' xuất hiện ngay cả khi soTien=0 (giá bán = giá vốn → lợi nhuận = 0).
-                // Trước đây check !soTien skip mọi dòng có Số Tiền = 0, khiến record bán huề vốn biến mất khỏi tab Thu/Chi.
                 if (!soTien && danhMucRaw !== 'Bán xe') return;
                 const khach = String(r[TC_CONFIG.COL.KHACH] || '').trim();
                 const khInfo = khach ? khMap[khach.toLowerCase()] || {} : {};
                 const sourceRowNum = TC_CONFIG.TC_START + idx;
-                // CTV & tỉ lệ: chỉ lấy từ TC record (cột K, L). Không fallback KH master.
-                // → Nếu dòng không có CTV thì không tính hoa hồng, dù KH có CTV mặc định.
                 const congTacVien = numCols >= 11 ? String(r[TC_CONFIG.COL.CONG_TAC_VIEN_TC] || '').trim() : '';
                 const rawTyLe = numCols >= 12 ? parseFloat(r[TC_CONFIG.COL.TY_LE_HOA_HONG_TC] || 0) || 0 : 0;
                 let tyLeHoaHong, hoaHong, hhType;
                 if (rawTyLe < 0) { hhType = 'fixed'; tyLeHoaHong = 0; hoaHong = Math.abs(rawTyLe); }
                 else { hhType = 'percent'; tyLeHoaHong = rawTyLe; hoaHong = (loai === 'Thu' && congTacVien && tyLeHoaHong > 0) ? Math.round(soTien * tyLeHoaHong / 100) : 0; }
 
-                // [2026-05] Enrich tenXe + hangXe để hiển thị trên giao diện Sổ Thu/Chi và receipt.
-                // Ưu tiên: xeMap (lookup theo biển số) → fallback cột MODEL trên chính record (chỉ có khi Bán xe).
                 const bienSoRecord = String(r[TC_CONFIG.COL.BIEN_SO] || '').trim();
                 const xeInfo = bienSoRecord ? (xeMap[bienSoRecord.toUpperCase()] || null) : null;
                 const modelOnRow = numCols >= 14 ? String(r[TC_CONFIG.COL.MODEL] || '').trim() : '';
@@ -2448,10 +2440,7 @@ function getThuChiData(filterLoai, filterMonth, filterBranch, _force) {
                     diaChiMua: numCols >= 20 ? String(r[TC_CONFIG.COL.DIA_CHI] || '').trim() : '',
                     maBan: numCols >= 21 ? String(r[TC_CONFIG.COL.MA_BAN] || '').trim() : '',
                     maXe: numCols >= 22 ? String(r[TC_CONFIG.COL.MA_XE] || '').trim() : '',
-                    // [2026-05] billSent: chỉ ý nghĩa với "Thuê mới" và "Tiền thuê tháng"
-                    // Normalize về boolean: cell có thể là TRUE/false (checkbox), 'TRUE'/'FALSE', 1/0.
                     billSent: (function () {
-                        // [FIX 2026-06] Dùng _hasBillSent — kiểm tra cột W có thực sự tồn tại không
                         if (!_hasBillSent) return false;
                         const v = r[TC_CONFIG.COL.BILL_SENT];
                         if (v === true) return true;
