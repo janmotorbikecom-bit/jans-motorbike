@@ -903,7 +903,7 @@ export default function ThuChiPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-hover)' }}>
-                  {['Ngày', 'Loại', 'Danh mục', 'Khách / Ghi chú', 'Thời gian thuê', 'Biển số', 'Chi nhánh', 'CTV', 'HH', 'Số tiền', 'Thao tác'].map(h => (
+                  {['Ngày', 'Loại', 'Danh mục', 'Khách / Ghi chú', 'Thời gian thuê', 'Tên xe', 'Biển số', 'Chi nhánh', 'CTV', 'HH', 'Số tiền', 'Thao tác'].map(h => (
                     <th key={h} style={{ padding: '12px 14px', color: 'var(--text-secondary)', fontWeight: 500, textAlign: h === 'Số tiền' ? 'right' : h === 'Thao tác' ? 'center' : 'left', whiteSpace: 'nowrap' }}>
                       {h === 'Ngày' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }} onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}>
@@ -1008,6 +1008,10 @@ export default function ThuChiPage() {
                               <span>{r.ketThuc || '—'}</span>
                             </div>
                           ) : '—'}
+                        </td>
+
+                        <td style={{ padding: '11px 14px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                          {r.tenXe || '—'}
                         </td>
 
                         <td style={{ padding: '11px 14px', whiteSpace: 'nowrap' }}>
@@ -1163,28 +1167,34 @@ export default function ThuChiPage() {
                   const found = khachHang?.find(k => k.tenKH === val);
                   setAddForm(prev => {
                     const updates = { khach: val };
-                    if (found && prev.danhMuc === 'Tiền thuê tháng') {
-                      updates.bienSo = found.bienSo;
+                    if (found) {
+                      if (found.bienSo) updates.bienSo = found.bienSo;
                       if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
-                      let batDauTemp = prev.batDau;
-                      if (found.ngayKetThuc) {
-                         let d;
-                         const parts = String(found.ngayKetThuc).split('/');
-                         if (parts.length === 3) {
-                            d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
-                         } else {
-                            d = new Date(found.ngayKetThuc);
-                         }
-                         if (d && !isNaN(d)) {
-                           const dd = String(d.getDate()).padStart(2, '0');
-                           const mm = String(d.getMonth() + 1).padStart(2, '0');
-                           batDauTemp = `${dd}/${mm}/${d.getFullYear()}`;
-                           updates.batDau = batDauTemp;
-                         }
-                      }
-                      if (prev.soTien) {
-                        const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, batDauTemp);
-                        if (newKetThuc) updates.ketThuc = newKetThuc;
+                      if (found.congTacVien) updates.congTacVien = found.congTacVien;
+                      const xeObj = xe?.find(x => x.bienSo === found.bienSo);
+                      if (xeObj) updates.tenXe = xeObj.tenXe || xeObj.model || '';
+                      
+                      if (prev.danhMuc === 'Tiền thuê tháng') {
+                        let batDauTemp = prev.batDau;
+                        if (found.ngayKetThuc) {
+                           let d;
+                           const parts = String(found.ngayKetThuc).split('/');
+                           if (parts.length === 3) {
+                              d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
+                           } else {
+                              d = new Date(found.ngayKetThuc);
+                           }
+                           if (d && !isNaN(d)) {
+                             const dd = String(d.getDate()).padStart(2, '0');
+                             const mm = String(d.getMonth() + 1).padStart(2, '0');
+                             batDauTemp = `${dd}/${mm}/${d.getFullYear()}`;
+                             updates.batDau = batDauTemp;
+                           }
+                        }
+                        if (prev.soTien) {
+                          const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, batDauTemp);
+                          if (newKetThuc) updates.ketThuc = newKetThuc;
+                        }
                       }
                     }
                     return { ...prev, ...updates };
@@ -1250,12 +1260,17 @@ export default function ThuChiPage() {
             </Field>
           </div>
 
-          <Field label="Chi nhánh">
-            <select value={addForm.chiNhanh} onChange={e => setAddForm(prev => ({ ...prev, chiNhanh: e.target.value }))} style={inputStyle}>
-              <option value="">Chọn chi nhánh</option>
-              {CHI_NHANH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Field label="Chi nhánh">
+              <select value={addForm.chiNhanh} onChange={e => setAddForm(prev => ({ ...prev, chiNhanh: e.target.value }))} style={inputStyle}>
+                <option value="">Chọn chi nhánh</option>
+                {CHI_NHANH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Cộng tác viên">
+              <input type="text" value={addForm.congTacVien || ''} onChange={e => setAddForm(prev => ({ ...prev, congTacVien: e.target.value }))} style={inputStyle} placeholder="Nhập tên CTV" />
+            </Field>
+          </div>
 
           <Field label="Ghi chú">
             <textarea value={addForm.ghiChu} onChange={e => setAddForm(prev => ({ ...prev, ghiChu: e.target.value }))} style={{ ...inputStyle, height: '60px', resize: 'vertical' }} />
@@ -1365,28 +1380,34 @@ export default function ThuChiPage() {
                   const found = khachHang?.find(k => k.tenKH === val);
                   setEditForm(prev => {
                     const updates = { khach: val };
-                    if (found && prev.danhMuc === 'Tiền thuê tháng') {
-                      updates.bienSo = found.bienSo;
+                    if (found) {
+                      if (found.bienSo) updates.bienSo = found.bienSo;
                       if (found.chiNhanh) updates.chiNhanh = found.chiNhanh;
-                      let batDauTemp = prev.batDau;
-                      if (found.ngayKetThuc) {
-                         let d;
-                         const parts = String(found.ngayKetThuc).split('/');
-                         if (parts.length === 3) {
-                            d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
-                         } else {
-                            d = new Date(found.ngayKetThuc);
-                         }
-                         if (d && !isNaN(d)) {
-                           const dd = String(d.getDate()).padStart(2, '0');
-                           const mm = String(d.getMonth() + 1).padStart(2, '0');
-                           batDauTemp = `${dd}/${mm}/${d.getFullYear()}`;
-                           updates.batDau = batDauTemp;
-                         }
-                      }
-                      if (prev.soTien) {
-                        const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, batDauTemp);
-                        if (newKetThuc) updates.ketThuc = newKetThuc;
+                      if (found.congTacVien) updates.congTacVien = found.congTacVien;
+                      const xeObj = xe?.find(x => x.bienSo === found.bienSo);
+                      if (xeObj) updates.tenXe = xeObj.tenXe || xeObj.model || '';
+                      
+                      if (prev.danhMuc === 'Tiền thuê tháng') {
+                        let batDauTemp = prev.batDau;
+                        if (found.ngayKetThuc) {
+                           let d;
+                           const parts = String(found.ngayKetThuc).split('/');
+                           if (parts.length === 3) {
+                              d = new Date(parts[2], parseInt(parts[1], 10) - 1, parts[0]);
+                           } else {
+                              d = new Date(found.ngayKetThuc);
+                           }
+                           if (d && !isNaN(d)) {
+                             const dd = String(d.getDate()).padStart(2, '0');
+                             const mm = String(d.getMonth() + 1).padStart(2, '0');
+                             batDauTemp = `${dd}/${mm}/${d.getFullYear()}`;
+                             updates.batDau = batDauTemp;
+                           }
+                        }
+                        if (prev.soTien) {
+                          const newKetThuc = autoCalcKetThuc(prev.soTien, found.giaThue, batDauTemp);
+                          if (newKetThuc) updates.ketThuc = newKetThuc;
+                        }
                       }
                     }
                     return { ...prev, ...updates };
@@ -1452,12 +1473,17 @@ export default function ThuChiPage() {
             </Field>
           </div>
 
-          <Field label="Chi nhánh">
-            <select value={editForm.chiNhanh} onChange={e => setEditForm(prev => ({ ...prev, chiNhanh: e.target.value }))} style={inputStyle}>
-              <option value="">Chọn chi nhánh</option>
-              {CHI_NHANH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </Field>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <Field label="Chi nhánh">
+              <select value={editForm.chiNhanh} onChange={e => setEditForm(prev => ({ ...prev, chiNhanh: e.target.value }))} style={inputStyle}>
+                <option value="">Chọn chi nhánh</option>
+                {CHI_NHANH_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Cộng tác viên">
+              <input type="text" value={editForm.congTacVien || ''} onChange={e => setEditForm(prev => ({ ...prev, congTacVien: e.target.value }))} style={inputStyle} placeholder="Nhập tên CTV" />
+            </Field>
+          </div>
 
           <Field label="Ghi chú">
             <textarea value={editForm.ghiChu} onChange={e => setEditForm(prev => ({ ...prev, ghiChu: e.target.value }))} style={{ ...inputStyle, height: '60px', resize: 'vertical' }} />
