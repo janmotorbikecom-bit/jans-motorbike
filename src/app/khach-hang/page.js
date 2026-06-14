@@ -137,7 +137,62 @@ function CustomerCard({ item, onClick, onInvoice }) {
 }
 
 // --- ADD CUSTOMER MODAL ---
+function SearchableSelect({ options, value, onChange, placeholder, className }) {
+  const [search, setSearch] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find(o => o.value === value);
+
+  return (
+    <div className="relative">
+      <div 
+        className={className + " flex justify-between items-center cursor-pointer select-none"} 
+        onClick={() => { setIsOpen(!isOpen); setSearch(''); }}
+      >
+        <span className={selectedOption ? 'truncate' : 'text-[var(--text-secondary)] truncate'}>
+           {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <svg className="w-4 h-4 text-[var(--text-secondary)] shrink-0 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </div>
+      
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-md shadow-2xl flex flex-col overflow-hidden">
+          <div className="p-2 border-b border-[var(--border)] bg-[var(--bg-card)]">
+            <input 
+              autoFocus
+              type="text" 
+              className="w-full bg-[var(--bg-hover)] border border-[var(--border)] rounded px-3 py-1.5 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500/50" 
+              placeholder="Gõ tìm tên xe hoặc biển số..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="max-h-60 overflow-auto">
+            {options.filter(o => o.label.toLowerCase().includes(search.toLowerCase())).map(o => (
+              <div
+                key={o.value}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-blue-500/20 text-[var(--text-primary)] ${value === o.value ? 'bg-blue-500/10 font-semibold text-blue-500' : ''}`}
+                onClick={() => {
+                  onChange(o.value);
+                  setIsOpen(false);
+                  setSearch('');
+                }}
+              >
+                {o.label}
+              </div>
+            ))}
+            {options.filter(o => o.label.toLowerCase().includes(search.toLowerCase())).length === 0 && (
+              <div className="px-3 py-2 text-sm text-[var(--text-secondary)] text-center italic">Không tìm thấy xe phù hợp</div>
+            )}
+          </div>
+        </div>
+      )}
+      {isOpen && <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}></div>}
+    </div>
+  );
+}
+
 const emptyForm = { tenKH: '', bienSo: '', xeThue: '', giaThue: '', tienCoc: '', ngayBatDau: '', ngayKetThuc: '', chiNhanh: '', congTacVien: '', ghiChu: '' };
+
 
 function AddCustomerModal({ open, onClose, onSuccess, xeList }) {
   const [form, setForm] = useState(emptyForm);
@@ -232,16 +287,19 @@ function AddCustomerModal({ open, onClose, onSuccess, xeList }) {
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Biển số *</label><input required className={inp + ' uppercase font-mono'} value={form.bienSo} onChange={e => setForm({...form, bienSo: e.target.value.toUpperCase()})} placeholder="79A1 123.45" /></div>
             <div>
               <label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Xe thuê *</label>
-              <select required className={inp} value={form.bienSo} onChange={e => {
-                const bienSo = e.target.value;
-                const found = xeList?.find(x => x.bienSo === bienSo);
-                setForm({...form, xeThue: found ? (found.tenXe || found.model || '') : form.xeThue, bienSo: bienSo, giaThue: found ? (found.giaThue || form.giaThue) : form.giaThue});
-              }}>
-                <option value="">-- Chọn xe --</option>
-                {(xeList || []).filter(x => x.trangThai === 'Trống').map(x => (
-                  <option key={x.bienSo} value={x.bienSo}>{x.tenXe || x.model} ({x.bienSo})</option>
-                ))}
-              </select>
+              <SearchableSelect 
+                className={inp} 
+                value={form.bienSo} 
+                placeholder="-- Chọn xe --"
+                options={(xeList || []).filter(x => x.trangThai === 'Trống').map(x => ({
+                  value: x.bienSo,
+                  label: `${x.tenXe || x.model} (${x.bienSo})`
+                }))}
+                onChange={bienSo => {
+                  const found = xeList?.find(x => x.bienSo === bienSo);
+                  setForm({...form, xeThue: found ? (found.tenXe || found.model || '') : form.xeThue, bienSo: bienSo || '', giaThue: found ? (found.giaThue || form.giaThue) : form.giaThue});
+                }}
+              />
             </div>
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Số điện thoại</label><input className={inp} value={form.lienLac} onChange={e => setForm({...form, lienLac: e.target.value})} placeholder="09xxxxxxxx" /></div>
             <div><label className="block text-xs font-semibold mb-1 text-[var(--text-secondary)] uppercase tracking-wider">Giá thuê (VND)</label><MoneyInput className={inp} value={form.giaThue} onChange={e => setForm({...form, giaThue: e.target.value})} placeholder="1500000" /></div>
