@@ -92,9 +92,7 @@ export function StoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const loadAll = useCallback(async (silent = false) => {
-    if (!silent) dispatch({ type: 'LOAD_START' });
-    try {
-      const bundleResult = await callAPI('getAppBundle');
+    const parseAndDispatch = (bundleResult) => {
       const rawKhachHang = parseList(bundleResult?.kh);
       const xeList = parseList(bundleResult?.xe);
       const tcData = parseList(bundleResult?.tc);
@@ -124,8 +122,31 @@ export function StoreProvider({ children }) {
           xeDaBan: xdbData,
         },
       });
+    };
+
+    let hasCache = false;
+    if (!silent && typeof window !== 'undefined') {
+      try {
+        const cachedStr = localStorage.getItem('JMB_APP_CACHE');
+        if (cachedStr) {
+          parseAndDispatch(JSON.parse(cachedStr));
+          hasCache = true;
+        }
+      } catch (e) {}
+      
+      if (!hasCache) dispatch({ type: 'LOAD_START' });
+    }
+
+    try {
+      const bundleResult = await callAPI('getAppBundle');
+      if (typeof window !== 'undefined') {
+        try { localStorage.setItem('JMB_APP_CACHE', JSON.stringify(bundleResult)); } catch (e) {}
+      }
+      parseAndDispatch(bundleResult);
     } catch (err) {
-      dispatch({ type: 'LOAD_ERROR', error: err.message || 'Không thể tải dữ liệu' });
+      if (!hasCache) {
+        dispatch({ type: 'LOAD_ERROR', error: err.message || 'Không thể tải dữ liệu' });
+      }
     }
   }, []);
 

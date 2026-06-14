@@ -87,10 +87,76 @@ const JMB_CACHE = {
     // [OPT 2026-05-20] Cache map xe-thuê-ngắn dùng trong getXeData / buildBienSoToKhachMap.
     SHORT_RENTAL_MAP: 'JMB_SHORT_RENTAL_MAP_V1'
 };
+const _EXECUTION_SHEET_CACHE = {};
+function _getMemoizedSheetData(sheetName, startRow, minCols) {
+    if (!_EXECUTION_SHEET_CACHE[sheetName]) {
+        try {
+            const ss = SpreadsheetApp.getActiveSpreadsheet();
+            const sh = ss.getSheetByName(sheetName);
+            if (!sh) { _EXECUTION_SHEET_CACHE[sheetName] = []; }
+            else {
+                const lr = sh.getLastRow();
+                if (lr < 1) { _EXECUTION_SHEET_CACHE[sheetName] = []; }
+                else {
+                    const lc = Math.max(sh.getLastColumn(), minCols || 25);
+                    _EXECUTION_SHEET_CACHE[sheetName] = sh.getRange(1, 1, lr, lc).getValues();
+                }
+            }
+        } catch (e) { _EXECUTION_SHEET_CACHE[sheetName] = []; }
+    }
+    const fullData = _EXECUTION_SHEET_CACHE[sheetName] || [];
+    if (fullData.length < startRow) return [];
+    return fullData.slice(startRow - 1);
+}
+
+function _putLargeCache_(key, valueStr, expirationInSeconds) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const chunkSize = 90000;
+        const chunks = Math.ceil(valueStr.length / chunkSize);
+        cache.put(key + '_chunks', String(chunks), expirationInSeconds);
+        for (let i = 0; i < chunks; i++) {
+            cache.put(key + '_' + i, valueStr.substring(i * chunkSize, (i + 1) * chunkSize), expirationInSeconds);
+        }
+    } catch (e) { }
+}
+
+function _getLargeCache_(key) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const chunksStr = cache.get(key + '_chunks');
+        if (!chunksStr) {
+            return cache.get(key);
+        }
+        const chunks = parseInt(chunksStr, 10);
+        let str = '';
+        for (let i = 0; i < chunks; i++) {
+            const chunk = cache.get(key + '_' + i);
+            if (!chunk) return null;
+            str += chunk;
+        }
+        return str;
+    } catch (e) { return null; }
+}
+
+function _removeLargeCache_(key) {
+    try {
+        const cache = CacheService.getScriptCache();
+        const chunksStr = cache.get(key + '_chunks');
+        if (chunksStr) {
+            const chunks = parseInt(chunksStr, 10);
+            const keysToRemove = [key + '_chunks'];
+            for (let i = 0; i < chunks; i++) keysToRemove.push(key + '_' + i);
+            cache.removeAll(keysToRemove);
+        }
+        cache.remove(key);
+    } catch (e) { }
+}
+
 function clearAppDataCache_(keys) {
     try {
         const list = keys && keys.length ? keys : [JMB_CACHE.XE_ALL, JMB_CACHE.KH_ALL, JMB_CACHE.TC_ALL, JMB_CACHE.XEBAN_ALL, JMB_CACHE.SHORT_RENTAL_MAP];
-        CacheService.getScriptCache().removeAll(list);
+        list.forEach(k => _removeLargeCache_(k));
     } catch (e) { }
 }
 // [OPT 2026-05-20] Version-stamp cho cache KH_DETAIL — bump version để invalidate tất cả entry cũ
@@ -443,7 +509,7 @@ function _buildActiveShortRentalVehicleMap_() {
         }
 
         const needCols = Math.max(sh.getLastColumn(), TC_CONFIG.COL.KET_THUC + 1);
-        const raw = sh.getRange(TC_CONFIG.TC_START, 1, lastRow - TC_CONFIG.TC_START + 1, needCols).getValues();
+        const raw = _getMemoizedSheetData(sh.getName(), TC_CONFIG.TC_START, needCols);
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const latestByPlate = {};
@@ -496,7 +562,7 @@ function buildBienSoToKhachMap() {
     if (sh) {
         const lastRow = sh.getLastRow();
         if (lastRow >= CONFIG.KH_DATA_START) {
-            const data = sh.getRange(CONFIG.KH_DATA_START, 1, lastRow - CONFIG.KH_DATA_START + 1, CONFIG.KH_COL.BIEN_SO + 1).getValues();
+            const data = _getMemoizedSheetData(CONFIG.SHEET_KH, CONFIG.KH_DATA_START, CONFIG.KH_COL.BIEN_SO + 1);
             data.forEach(r => {
                 const ten = String(r[CONFIG.KH_COL.TEN] || '').trim();
                 const bs = String(r[CONFIG.KH_COL.BIEN_SO] || '').trim().toUpperCase();
@@ -683,10 +749,9 @@ function buildHangStats_(vehicles) {
 function getXeData(_force) {
     try {
         // Cache 60s — tránh đọc lại sheet khi reload nhanh
-        const _cache = CacheService.getScriptCache();
-        if (_force) { try { _cache.remove(JMB_CACHE.XE_ALL); } catch (_) { } }
+        if (_force) { try { _removeLargeCache_(JMB_CACHE.XE_ALL); } catch (_) { } }
         else {
-            const _cached = _cache.get(JMB_CACHE.XE_ALL);
+            const _cached = _getLargeCache_(JMB_CACHE.XE_ALL);
             if (_cached) { try { return JSON.parse(_cached); } catch (_) { } }
         }
         const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -697,7 +762,7 @@ function getXeData(_force) {
             const cap = getDashboardCapital_();
             return { success: true, data: [], stats: { tongXe: 0, tongVon: 0, xeTrong: 0, xeDangThue: 0, hangStats: buildHangStats_([]), vonChuKyTruoc: cap.vonChuKy, vonChuKyUpdatedAt: cap.updatedAt, vonChuKyUpdatedBy: cap.updatedBy } };
         }
-        const raw = sh.getRange(CONFIG.XE_DATA_START, 1, lastRow - CONFIG.XE_DATA_START + 1, 7).getValues();
+        const raw = _getMemoizedSheetData(CONFIG.SHEET_XE, CONFIG.XE_DATA_START, 7);
         const map = buildBienSoToKhachMap();
         const vehicles = []; let tongVon = 0, xeTrong = 0, xeDangThue = 0;
         raw.forEach(r => {
@@ -719,7 +784,7 @@ function getXeData(_force) {
         });
         const cap = getDashboardCapital_();
         const _result = { success: true, data: vehicles, stats: { tongXe: vehicles.length, tongVon, xeTrong, xeDangThue, hangStats: buildHangStats_(vehicles), vonChuKyTruoc: cap.vonChuKy, vonChuKyUpdatedAt: cap.updatedAt, vonChuKyUpdatedBy: cap.updatedBy } };
-        try { _cache.put(JMB_CACHE.XE_ALL, JSON.stringify(_result), 300); } catch (_) { }
+        try { _putLargeCache_(JMB_CACHE.XE_ALL, JSON.stringify(_result), 300); } catch (_) { }
         return _result;
     } catch (e) { return { success: false, error: e.message }; }
 }
@@ -775,6 +840,31 @@ function updateXe(originalBienSo, formData, userInfo) {
         logActivity_(userInfo, 'SỬA XE', 'Xe', formData.bienSo, 'Tên: ' + formData.tenXe + ' · Hãng: ' + ((normalizeBrandName_(formData.hangXe || inferXeBrand_(formData.tenXe, ''))) || '--'));
         return { success: true, message: 'Đã cập nhật xe "' + formData.tenXe + '".' };
     } catch (e) { Logger.log('updateXe: ' + e.message); return { success: false, error: e.message }; }
+}
+
+function deleteXe(bienSo, userInfo) {
+    try {
+        assertAdmin_(userInfo, 'xóa xe');
+        const ss = SpreadsheetApp.getActiveSpreadsheet();
+        const sh = ss.getSheetByName(CONFIG.SHEET_XE);
+        if (!sh) throw new Error('Không tìm thấy sheet "' + CONFIG.SHEET_XE + '"');
+        if (!bienSo || !bienSo.trim()) throw new Error('Biển số không hợp lệ.');
+
+        const lastRow = sh.getLastRow();
+        if (lastRow < CONFIG.XE_DATA_START) throw new Error('Không tìm thấy xe.');
+        const bssRange = sh.getRange(CONFIG.XE_DATA_START, CONFIG.XE_COL.BIEN_SO + 1, lastRow - CONFIG.XE_DATA_START + 1, 1).getValues();
+        let rowNum = -1;
+        for (let i = 0; i < bssRange.length; i++) {
+            if (String(bssRange[i][0]).trim().toUpperCase() === bienSo.trim().toUpperCase()) { rowNum = CONFIG.XE_DATA_START + i; break; }
+        }
+        if (rowNum === -1) throw new Error('Không tìm thấy xe với biển số: "' + bienSo + '"');
+
+        const tenXe = String(sh.getRange(rowNum, CONFIG.XE_COL.TEN + 1).getValue() || '');
+        sh.deleteRow(rowNum);
+        try { clearXeKhCache_(); } catch (_) { }
+        logActivity_(userInfo, 'XÓA XE', 'Xe', bienSo, 'Tên xe bị xóa: ' + tenXe);
+        return { success: true, message: 'Đã xóa xe biển số "' + bienSo + '".' };
+    } catch (e) { return { success: false, error: e.message }; }
 }
 
 
@@ -1149,18 +1239,16 @@ function getKhachHangData_uncached_() {
 
 function getKhachHangData(_force) {
     try {
-        const cache = CacheService.getScriptCache();
-        if (_force) { try { cache.remove(JMB_CACHE.KH_ALL); } catch (_) { } }
+        if (_force) { try { _removeLargeCache_(JMB_CACHE.KH_ALL); } catch (_) { } }
         else {
             try {
-                const cached = cache.get(JMB_CACHE.KH_ALL);
+                const cached = _getLargeCache_(JMB_CACHE.KH_ALL);
                 if (cached) return JSON.parse(cached);
             } catch (_ce) { }
         }
         const result = getKhachHangData_uncached_();
         if (result && result.success) {
-            // [OPT 2026-05-20] TTL 300s (cũ 180s) — cache sẽ tự được clear khi có sửa Xe/KH/Thu/Chi
-            try { cache.put(JMB_CACHE.KH_ALL, JSON.stringify(result), 300); } catch (_pe) { }
+            try { _putLargeCache_(JMB_CACHE.KH_ALL, JSON.stringify(result), 300); } catch (_pe) { }
         }
         return result;
     } catch (e) { return { success: false, error: e.message }; }
@@ -1321,20 +1409,20 @@ function findKhachHangRow_(customerName, bienSo = '') {
     const data = sh.getRange(CONFIG.KH_DATA_START, 1, lastRow - CONFIG.KH_DATA_START + 1, sh.getLastColumn()).getValues();
     const kw = customerName.trim().toLowerCase();
     const plateKw = String(bienSo || '').trim().toLowerCase();
-    
+
     if (plateKw) {
         for (let i = 0; i < data.length; i++) {
-             if (String(data[i][CONFIG.KH_COL.TEN] || '').trim().toLowerCase() === kw &&
-                 String(data[i][CONFIG.KH_COL.BIEN_SO] || '').trim().toLowerCase() === plateKw) {
-                 return CONFIG.KH_DATA_START + i;
-             }
+            if (String(data[i][CONFIG.KH_COL.TEN] || '').trim().toLowerCase() === kw &&
+                String(data[i][CONFIG.KH_COL.BIEN_SO] || '').trim().toLowerCase() === plateKw) {
+                return CONFIG.KH_DATA_START + i;
+            }
         }
     }
-    
+
     for (let i = 0; i < data.length; i++) {
-         if (String(data[i][CONFIG.KH_COL.TEN] || '').trim().toLowerCase() === kw) {
-             return CONFIG.KH_DATA_START + i;
-         }
+        if (String(data[i][CONFIG.KH_COL.TEN] || '').trim().toLowerCase() === kw) {
+            return CONFIG.KH_DATA_START + i;
+        }
     }
     return -1;
 }
@@ -1351,7 +1439,7 @@ function updateKhachHang(originalName, formData, userInfo) {
         const currentDocsRaw = String(sh.getRange(rowNum, CONFIG.KH_COL.GIAY_TO_URLS + 1).getValue() || '').trim();
         const existing = parseDocsCell_(currentDocsRaw);
         let docsJson = currentDocsRaw;
-        
+
         // [New] If frontend explicitly provides giayToUrls, use it
         let uploadedCount = 0;
         if (formData.giayToUrls !== undefined) {
@@ -2304,13 +2392,12 @@ function getXeDaBanData_uncached_(filterMonth, filterBranch, keyword, buyer) {
 function getXeDaBanData(filterMonth, filterBranch, keyword, buyer, _force) {
     try {
         const hasFilter = filterMonth || filterBranch || keyword || buyer;
-        const cache = CacheService.getScriptCache();
-        if (_force) { try { cache.remove(JMB_CACHE.XEBAN_ALL); } catch (_) { } }
+        if (_force) { try { _removeLargeCache_(JMB_CACHE.XEBAN_ALL); } catch (_) { } }
         if (!hasFilter && !_force) {
-            try { const cached = cache.get(JMB_CACHE.XEBAN_ALL); if (cached) return JSON.parse(cached); } catch (_ce) { }
+            try { const cached = _getLargeCache_(JMB_CACHE.XEBAN_ALL); if (cached) return JSON.parse(cached); } catch (_ce) { }
         }
         const result = getXeDaBanData_uncached_(filterMonth, filterBranch, keyword, buyer);
-        if (!hasFilter && result && result.success) { try { cache.put(JMB_CACHE.XEBAN_ALL, JSON.stringify(result), 300); } catch (_pe) { } }
+        if (!hasFilter && result && result.success) { try { _putLargeCache_(JMB_CACHE.XEBAN_ALL, JSON.stringify(result), 300); } catch (_pe) { } }
         return result;
     } catch (e) { return { success: false, error: e.message }; }
 }
@@ -2326,10 +2413,9 @@ function getXeDaBanDetail(maBan) {
 function getThuChiData(filterLoai, filterMonth, filterBranch, _force) {
     try {
         const hasFilter = filterLoai || filterMonth || filterBranch;
-        const cache = CacheService.getScriptCache();
-        if (_force) { try { cache.remove(JMB_CACHE.TC_ALL); } catch (_) { } }
+        if (_force) { try { _removeLargeCache_(JMB_CACHE.TC_ALL); } catch (_) { } }
         if (!hasFilter && !_force) {
-            try { const cached = cache.get(JMB_CACHE.TC_ALL); if (cached) return JSON.parse(cached); } catch (_ce) { }
+            try { const cached = _getLargeCache_(JMB_CACHE.TC_ALL); if (cached) return JSON.parse(cached); } catch (_ce) { }
         }
 
         const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -2501,7 +2587,9 @@ function getThuChiData(filterLoai, filterMonth, filterBranch, _force) {
         } catch (_eMaxKt) { Logger.log('maxKetThuc per KH error: ' + _eMaxKt.message); }
 
         const _tcResult = { success: true, data: records, stats: buildTCStats(records), branchStats: buildBranchStats(records) };
-        // [FIX 2026-06] Không cache TC — đọc thẳng sheet
+        if (!hasFilter) {
+            try { _putLargeCache_(JMB_CACHE.TC_ALL, JSON.stringify(_tcResult), 300); } catch (_) { }
+        }
         return _tcResult;
     } catch (e) { Logger.log('getThuChiData: ' + e.message); return { success: false, error: e.message }; }
 }
@@ -4091,6 +4179,31 @@ function doPost(e) {
             loginUser,
             uploadFileToDrive,
             updateBillSentStatus,
+            // Thêm các API endpoint khác
+            getAppBundle: (typeof getAppBundle !== 'undefined' ? getAppBundle : null),
+            getXeKhBundle: (typeof getXeKhBundle !== 'undefined' ? getXeKhBundle : null),
+            getXeDaBanData: (typeof getXeDaBanData !== 'undefined' ? getXeDaBanData : null),
+            getXeDaBanDetail: (typeof getXeDaBanDetail !== 'undefined' ? getXeDaBanDetail : null),
+            getNotes: (typeof getKhachHangNotes !== 'undefined' ? getKhachHangNotes : null),
+            addKhachHangNote: (typeof addKhachHangNote !== 'undefined' ? addKhachHangNote : null),
+            deleteKhachHangNote: (typeof deleteKhachHangNote !== 'undefined' ? deleteKhachHangNote : null),
+            getShopInfo: (typeof getShopInfo !== 'undefined' ? getShopInfo : null),
+            setShopInfo: (typeof setShopInfo !== 'undefined' ? setShopInfo : null),
+            updateXe: (typeof updateXe !== 'undefined' ? updateXe : null),
+            deleteXe: (typeof deleteXe !== 'undefined' ? deleteXe : null),
+            addXe: (typeof addXe !== 'undefined' ? addXe : null),
+            getDashboardCapital: (typeof getDashboardCapital !== 'undefined' ? getDashboardCapital : null),
+            saveDashboardCapital: (typeof saveDashboardCapital !== 'undefined' ? saveDashboardCapital : null),
+            getUsers: (typeof getUsers !== 'undefined' ? getUsers : null),
+            saveUser: (typeof saveUser !== 'undefined' ? saveUser : null),
+            deleteUser: (typeof deleteUser !== 'undefined' ? deleteUser : null),
+            getEditHistory: (typeof getEditHistory !== 'undefined' ? getEditHistory : null),
+            getBrandList: (typeof getBrandList !== 'undefined' ? getBrandList : null),
+            addBrand: (typeof addBrand !== 'undefined' ? addBrand : null),
+            updateBrand: (typeof updateBrand !== 'undefined' ? updateBrand : null),
+            deleteBrand: (typeof deleteBrand !== 'undefined' ? deleteBrand : null),
+            forceRentalSyncFromThuChi: (typeof forceRentalSyncFromThuChi !== 'undefined' ? forceRentalSyncFromThuChi : null),
+            getReceiptData: (typeof getReceiptData !== 'undefined' ? getReceiptData : null),
         };
 
         if (!API[fn]) {
