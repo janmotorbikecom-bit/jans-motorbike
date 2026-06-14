@@ -1027,15 +1027,20 @@ export default function ThuChiPage() {
                         <td style={{ padding: '11px 14px', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>{renderHH(r)}</td>
 
                         <td style={{ padding: '11px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {r.danhMuc === 'Bán xe' ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px', fontWeight: 600 }}>
-                              <div style={{ color: '#3b82f6' }} title="Giá bán">+{fmtMoney(r.soTien)}</div>
-                              <div style={{ color: '#9ca3af' }} title="Giá vốn">-{fmtMoney(r.giaVon || 0)}</div>
-                              <div style={{ color: (r.loiNhuan || 0) >= 0 ? '#22c55e' : '#ef4444', borderTop: '1px solid var(--border)', paddingTop: '2px', marginTop: '2px' }} title="Lợi nhuận">
-                                = {(r.loiNhuan || 0) > 0 ? '+' : ''}{fmtMoney(r.loiNhuan || 0)}
+                          {r.danhMuc === 'Bán xe' ? (() => {
+                            const pPrice = Number(r.soTien) || 0;
+                            const pCost = Number(r.giaVon) || 0;
+                            const pProfit = pPrice - pCost;
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12px', fontWeight: 600 }}>
+                                <div style={{ color: '#3b82f6' }} title="Giá bán">+{fmtMoney(pPrice)}</div>
+                                <div style={{ color: '#ef4444' }} title="Giá vốn">-{fmtMoney(pCost)}</div>
+                                <div style={{ color: pProfit >= 0 ? '#22c55e' : '#ef4444', borderTop: '1px solid var(--border)', paddingTop: '2px', marginTop: '2px' }} title="Lợi nhuận">
+                                  = {pProfit > 0 ? '+' : ''}{fmtMoney(pProfit)}
+                                </div>
                               </div>
-                            </div>
-                          ) : (
+                            );
+                          })() : (
                             <span style={{ fontWeight: 700, color: isThu ? '#22c55e' : '#ef4444' }}>
                               {isThu ? '+' : '-'}{fmtMoney(r.soTien)}
                             </span>
