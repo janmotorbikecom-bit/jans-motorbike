@@ -148,6 +148,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
         ngayKetThuc: formData.ngayKetThuc,
         chiNhanh: formData.chiNhanh,
         congTacVien: formData.congTacVien,
+        tyLeHoaHong: formData.tyLeHoaHong,
         ghiChu: formData.ghiChu,
       };
 
@@ -208,6 +209,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
         ngayKetThuc: customer.ngayKetThuc,
         chiNhanh: customer.chiNhanh,
         congTacVien: customer.congTacVien,
+        tyLeHoaHong: customer.tyLeHoaHong,
         ghiChu: updatedGhiChu,
       };
 
@@ -456,7 +458,7 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                       <CustomDatePicker value={formData.ngayKetThuc || ''} onChange={e => setFormData({ ...formData, ngayKetThuc: e.target.value })} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-1">Chi nhánh</label>
                       <input type="text" value={formData.chiNhanh || ''} onChange={e => setFormData({ ...formData, chiNhanh: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
@@ -464,6 +466,10 @@ export default function CustomerProfileModal({ open, onClose, customer, thuChiDa
                     <div>
                       <label className="block text-sm font-medium mb-1">Cộng tác viên</label>
                       <input type="text" value={formData.congTacVien || ''} onChange={e => setFormData({ ...formData, congTacVien: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Tỉ lệ HH (%)</label>
+                      <input type="number" step="0.1" value={formData.tyLeHoaHong || ''} onChange={e => setFormData({ ...formData, tyLeHoaHong: e.target.value })} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-3 py-2 text-[var(--text-primary)]" />
                     </div>
                   </div>
                   <div>
