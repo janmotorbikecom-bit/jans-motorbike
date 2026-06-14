@@ -94,16 +94,12 @@ export function StoreProvider({ children }) {
   const loadAll = useCallback(async (silent = false) => {
     if (!silent) dispatch({ type: 'LOAD_START' });
     try {
-      // Load all in parallel — use allSettled so one failure doesn't block others
-      const [khResult, xeResult, tcResult, xdbResult] = await Promise.allSettled([
-        callAPI('getKhachHangData'),
-        callAPI('getXeData'),
-        callAPI('getThuChiData', '', '', ''),
-        callAPI('getXeDaBanData'),
-      ]);
-
-      const rawKhachHang = parseList(khResult.status === 'fulfilled' ? khResult.value : []);
-      const xeList = parseList(xeResult.status === 'fulfilled' ? xeResult.value : []);
+      const bundleResult = await callAPI('getAppBundle');
+      const rawKhachHang = parseList(bundleResult?.kh);
+      const xeList = parseList(bundleResult?.xe);
+      const tcData = parseList(bundleResult?.tc);
+      const xdbData = parseList(bundleResult?.xeban);
+      const xeStatsData = bundleResult?.xe?.stats || null;
 
       const activeKhachHang = rawKhachHang.filter(k => {
         if (k.bienSo) {
@@ -123,9 +119,9 @@ export function StoreProvider({ children }) {
         payload: {
           khachHang: activeKhachHang,
           xe: xeList,
-          xeStats: (xeResult.status === 'fulfilled' && xeResult.value?.stats) ? xeResult.value.stats : null,
-          thuChi: parseList(tcResult.status === 'fulfilled' ? tcResult.value : []).filter(r => r && (r.loai === 'Thu' || r.loai === 'Chi')),
-          xeDaBan: parseList(xdbResult.status === 'fulfilled' ? xdbResult.value : []),
+          xeStats: xeStatsData,
+          thuChi: tcData.filter(r => r && (r.loai === 'Thu' || r.loai === 'Chi')),
+          xeDaBan: xdbData,
         },
       });
     } catch (err) {
